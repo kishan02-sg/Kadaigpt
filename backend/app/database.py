@@ -53,15 +53,21 @@ engine_kwargs = {
 
 if not is_sqlite:
     if is_serverless:
-        # Serverless (Vercel): Use NullPool — each invocation gets a fresh connection
-        # This prevents connection leaks since serverless functions are ephemeral
+        # Serverless (Vercel): Use a SMALL pool instead of NullPool
+        # Warm instances reuse the same Python process, so keeping 1 connection
+        # alive avoids the ~3s SSL handshake on every request
         engine_kwargs.update({
-            "poolclass": NullPool,
+            "pool_pre_ping": True,         # Verify connection is alive before use
+            "pool_size": 1,                # Single connection (one request at a time)
+            "max_overflow": 2,             # Allow 2 extra under burst
+            "pool_recycle": 300,           # Recycle every 5 min (matches Vercel warm time)
+            "pool_timeout": 10,            # Fail fast if pool exhausted
             "connect_args": {
                 "server_settings": {
                     "application_name": "kadaigpt-serverless",
-                    "statement_timeout": "25000",  # 25s (Vercel hobby has ~10s, but buffer for DB)
-                }
+                    "statement_timeout": "25000",
+                },
+                "command_timeout": 10,     # 10s connection timeout
             }
         })
     else:
@@ -116,15 +122,10 @@ async def init_db():
         return  # Already initialized this instance
     
     if is_serverless:
-        # Serverless: just verify connection, skip heavy init
-        # Tables should already exist in Supabase (created via /api/v1/admin/init-db)
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
-            logger.info("[Database] Connection verified (serverless)")
-            _db_initialized = True
-        except Exception as e:
-            logger.warning(f"[Database] Connection check failed: {e}")
+        # Serverless: skip all DB work on startup — connection establishes on first query
+        # Tables already exist in Supabase (created via SQL Editor)
+        logger.info("[Database] Serverless mode — skipping init (lazy connect)")
+        _db_initialized = True
         return
     
     # Full init for server mode (Render, Docker, etc.)
