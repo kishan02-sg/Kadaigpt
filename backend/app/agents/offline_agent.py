@@ -66,8 +66,14 @@ class OfflineAgent:
     - Compress and batch sync for efficiency
     """
     
-    def __init__(self, storage_path: str = "./offline_data"):
+    def __init__(self, storage_path: str = None):
         self.agent_name = "OfflineAgent"
+        # Vercel has read-only filesystem — use /tmp for storage
+        if storage_path is None:
+            if os.environ.get("VERCEL"):
+                storage_path = "/tmp/offline_data"
+            else:
+                storage_path = "./offline_data"
         self.storage_path = storage_path
         self.network_status = NetworkStatus.ONLINE
         self.pending_transactions: List[OfflineTransaction] = []
@@ -77,7 +83,13 @@ class OfflineAgent:
         self._monitor_task = None
         
         # Ensure storage directory exists
-        os.makedirs(storage_path, exist_ok=True)
+        try:
+            os.makedirs(storage_path, exist_ok=True)
+        except OSError:
+            # Read-only filesystem fallback
+            self.storage_path = "/tmp/offline_data"
+            os.makedirs(self.storage_path, exist_ok=True)
+
         
         # Pending transactions will be loaded on first access
         self._loaded = False

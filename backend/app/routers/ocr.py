@@ -70,9 +70,11 @@ async def process_handwritten_bill(
         language_hint=language
     )
     
-    # Save image and create record
-    upload_dir = os.path.join(settings.upload_dir, "ocr_images")
+    # Save image and create record (use /tmp on Vercel)
+    base_upload_dir = settings.upload_dir if not os.environ.get("VERCEL") else "/tmp/uploads"
+    upload_dir = os.path.join(base_upload_dir, "ocr_images")
     os.makedirs(upload_dir, exist_ok=True)
+
     
     filename = f"{uuid.uuid4().hex}.jpg"
     filepath = os.path.join(upload_dir, filename)
