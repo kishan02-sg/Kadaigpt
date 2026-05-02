@@ -22,6 +22,21 @@ db_url = settings.get_async_database_url()
 is_sqlite = db_url.startswith("sqlite")
 is_serverless = settings.is_serverless
 
+# asyncpg does NOT support 'sslmode' as a URL parameter (that's psycopg2-only)
+# Strip it from the URL and handle SSL via connect_args instead
+_needs_ssl = False
+if "sslmode=" in db_url:
+    _needs_ssl = True
+    # Remove sslmode=require (or any sslmode value) from URL
+    import re
+    db_url = re.sub(r'[?&]sslmode=[^&]*', '', db_url)
+    # Clean up trailing ? or &&
+    db_url = db_url.rstrip('?').replace('&&', '&').rstrip('&')
+
+# Also detect Supabase/Neon domains that always need SSL
+if any(domain in db_url for domain in ["supabase.com", "supabase.co", "neon.tech"]):
+    _needs_ssl = True
+
 # Log connection target (hide credentials)
 if "@" in db_url:
     log_url = db_url.split("@")[-1]
@@ -49,10 +64,6 @@ if not is_sqlite:
                 }
             }
         })
-        
-        # Supabase requires SSL
-        if any(domain in db_url for domain in ["supabase.com", "supabase.co"]):
-            engine_kwargs["connect_args"]["ssl"] = "require"
     else:
         # Server mode (Render, Railway, VPS): Use connection pooling
         engine_kwargs.update({
@@ -69,12 +80,17 @@ if not is_sqlite:
             }
         })
     
-    # Neon requires SSL
-    if "neon.tech" in db_url:
-        engine_kwargs["connect_args"]["ssl"] = "require"
+    # Apply SSL for Supabase/Neon via connect_args (asyncpg uses 'ssl' not 'sslmode')
+    if _needs_ssl:
+        import ssl as _ssl
+        ssl_ctx = _ssl.create_default_context()
+        ssl_ctx.check_hostname = False
+        ssl_ctx.verify_mode = _ssl.CERT_NONE
+        engine_kwargs["connect_args"]["ssl"] = ssl_ctx
 
 # Create async engine
 engine = create_async_engine(db_url, **engine_kwargs)
+
 
 # Create async session factory
 async_session_maker = async_sessionmaker(
