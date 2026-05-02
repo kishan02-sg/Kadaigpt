@@ -112,9 +112,22 @@ _db_initialized = False
 async def init_db():
     """Initialize database - create all tables and indexes"""
     global _db_initialized
-    if _db_initialized and is_serverless:
-        return  # Skip re-init in serverless (tables already exist)
+    if _db_initialized:
+        return  # Already initialized this instance
     
+    if is_serverless:
+        # Serverless: just verify connection, skip heavy init
+        # Tables should already exist in Supabase (created via /api/v1/admin/init-db)
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            logger.info("[Database] Connection verified (serverless)")
+            _db_initialized = True
+        except Exception as e:
+            logger.warning(f"[Database] Connection check failed: {e}")
+        return
+    
+    # Full init for server mode (Render, Docker, etc.)
     logger.info("[Database] Initializing database tables...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -126,6 +139,7 @@ async def init_db():
         await create_indexes()
     
     _db_initialized = True
+
 
 
 async def run_migrations():

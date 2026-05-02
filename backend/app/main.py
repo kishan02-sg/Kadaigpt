@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 
 from sqlalchemy import text
 from app.config import get_settings
-from app.database import engine, Base, check_db_health, init_db
+from app.database import engine, Base, check_db_health, init_db, run_migrations, create_indexes, is_sqlite
 from app.routers import (
     auth_router,
     products_router,
@@ -135,8 +135,8 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://127.0.0.1:3000",
     "https://kadaigpt.vercel.app",
+    "https://kadaigpt-main.vercel.app",
     "https://kadaigpt.onrender.com",
-    # Add any custom Vercel domain here
 ]
 
 # In development, allow all origins for convenience
@@ -263,6 +263,23 @@ async def health_check():
 async def ping():
     """Minimal response for uptime monitors. Returns instantly."""
     return {"pong": True, "ts": int(time.time())}
+
+
+@app.post("/api/setup-db")
+async def setup_database():
+    """One-time endpoint to create all database tables in Supabase.
+    Call this once after first deployment to initialize the schema.
+    """
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        # Run migrations too
+        if not is_sqlite:
+            await run_migrations()
+            await create_indexes()
+        return {"status": "ok", "message": "Database tables created successfully"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)[:200]}
 
 
 # API Info endpoint
