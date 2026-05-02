@@ -273,10 +273,6 @@ async def setup_database():
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
-        # Run migrations too
-        if not is_sqlite:
-            await run_migrations()
-            await create_indexes()
         return {"status": "ok", "message": "Database tables created successfully"}
     except Exception as e:
         return {"status": "error", "message": str(e)[:200]}
