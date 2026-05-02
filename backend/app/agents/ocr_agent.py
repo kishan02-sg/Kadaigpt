@@ -18,7 +18,12 @@ try:
 except ImportError:
     GEMINI_AVAILABLE = False
 
-from PIL import Image
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    Image = None
 import io
 
 

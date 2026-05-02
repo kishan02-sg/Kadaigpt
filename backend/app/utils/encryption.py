@@ -9,7 +9,14 @@ import base64
 import hashlib
 import logging
 from typing import Optional
-from cryptography.fernet import Fernet, MultiFernet
+
+try:
+    from cryptography.fernet import Fernet, MultiFernet
+    FERNET_AVAILABLE = True
+except ImportError:
+    FERNET_AVAILABLE = False
+    Fernet = None
+    MultiFernet = None
 
 logger = logging.getLogger("KadaiGPT.Encryption")
 
