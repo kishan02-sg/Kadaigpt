@@ -64,3 +64,5 @@ uploads/
 # AI Tool Metadata
 .gemini/
 .agent/
+
+.vercel
