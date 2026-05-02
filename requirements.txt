@@ -1,0 +1,4 @@
+# Requirements for Vercel Python serverless functions
+# This file is at root level for Vercel to discover
+# Full requirements are in api/requirements.txt
+-r api/requirements.txt

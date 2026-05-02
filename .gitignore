@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+.eggs/
+*.egg-info/
+
+# Environment
+.env
+.env.local
+.env.production.local
+.venv/
+venv/
+ENV/
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+coverage/
+
+# Build output
+frontend/dist/
+build/
+
+# Cache
+.cache/
+
+# Temp files
+*.tmp
+build_output.txt
+error.log
+
+# Vercel
+.vercel/
+
+# WhatsApp auth (sensitive)
+whatsapp-gateway/auth_info/
+whatsapp-gateway/auth_base64.txt
+whatsapp-gateway/creds_base64.txt
+
+# Uploads
+uploads/
+
+# AI Tool Metadata
+.gemini/
+.agent/

@@ -1,0 +1,30 @@
+{
+    "name": "kadaigpt-whatsapp-agent",
+    "version": "2.0.0",
+    "description": "KadaiGPT AI-Powered WhatsApp Agent for Retail Intelligence",
+    "main": "bot.js",
+    "scripts": {
+        "start": "node bot.js",
+        "dev": "node bot.js"
+    },
+    "dependencies": {
+        "@whiskeysockets/baileys": "^6.6.0",
+        "axios": "^1.13.4",
+        "pg": "^8.18.0",
+        "pino": "^8.17.0",
+        "qrcode": "^1.5.4",
+        "qrcode-terminal": "^0.12.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "keywords": [
+        "whatsapp",
+        "bot",
+        "ai",
+        "retail",
+        "kadaigpt"
+    ],
+    "author": "KadaiGPT Team",
+    "license": "MIT"
+}
