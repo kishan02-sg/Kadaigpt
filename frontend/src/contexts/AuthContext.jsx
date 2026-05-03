@@ -6,8 +6,8 @@ export const USER_ROLES = {
     ADMIN: 'admin',
     OWNER: 'owner',
     MANAGER: 'manager',
-    STAFF: 'staff',
-    CASHIER: 'cashier'
+    CASHIER: 'cashier',
+    INVENTORY_MANAGER: 'inventory_manager'
 }
 
 // Role-based permissions
@@ -36,6 +36,23 @@ export const PERMISSIONS = {
         canEditSettings: true,
         canViewReports: true,
         canDeleteData: true,
+        canCreateBill: false,        // Owner monitors, doesn't bill
+        canEditProducts: false,       // View only
+        canViewCustomers: true,
+        canManageSuppliers: true,
+        canViewAnalytics: true,
+        canManageLoyalty: true,
+        canAccessWhatsApp: true,
+        canViewExpenses: true,
+        canBulkOperations: false,
+    },
+    [USER_ROLES.MANAGER]: {
+        canAccessAdmin: false,
+        canManageUsers: true,
+        canViewAllStores: false,
+        canEditSettings: true,
+        canViewReports: true,
+        canDeleteData: true,
         canCreateBill: true,
         canEditProducts: true,
         canViewCustomers: true,
@@ -46,40 +63,6 @@ export const PERMISSIONS = {
         canViewExpenses: true,
         canBulkOperations: true,
     },
-    [USER_ROLES.MANAGER]: {
-        canAccessAdmin: false,
-        canManageUsers: false,
-        canViewAllStores: false,
-        canEditSettings: false,
-        canViewReports: true,
-        canDeleteData: false,
-        canCreateBill: true,
-        canEditProducts: true,
-        canViewCustomers: true,
-        canManageSuppliers: true,
-        canViewAnalytics: true,
-        canManageLoyalty: true,
-        canAccessWhatsApp: false,
-        canViewExpenses: true,
-        canBulkOperations: false,
-    },
-    [USER_ROLES.STAFF]: {
-        canAccessAdmin: false,
-        canManageUsers: false,
-        canViewAllStores: false,
-        canEditSettings: false,
-        canViewReports: false,
-        canDeleteData: false,
-        canCreateBill: true,
-        canEditProducts: false,
-        canViewCustomers: true,
-        canManageSuppliers: false,
-        canViewAnalytics: false,
-        canManageLoyalty: false,
-        canAccessWhatsApp: false,
-        canViewExpenses: false,
-        canBulkOperations: false,
-    },
     [USER_ROLES.CASHIER]: {
         canAccessAdmin: false,
         canManageUsers: false,
@@ -88,14 +71,31 @@ export const PERMISSIONS = {
         canViewReports: false,
         canDeleteData: false,
         canCreateBill: true,
-        canEditProducts: false,
-        canViewCustomers: false,
+        canEditProducts: false,       // View only, can't change price/stock
+        canViewCustomers: true,
         canManageSuppliers: false,
         canViewAnalytics: false,
         canManageLoyalty: false,
         canAccessWhatsApp: false,
         canViewExpenses: false,
         canBulkOperations: false,
+    },
+    [USER_ROLES.INVENTORY_MANAGER]: {
+        canAccessAdmin: false,
+        canManageUsers: false,
+        canViewAllStores: false,
+        canEditSettings: false,
+        canViewReports: false,
+        canDeleteData: false,
+        canCreateBill: false,
+        canEditProducts: true,        // Full product management
+        canViewCustomers: false,      // No customer access
+        canManageSuppliers: true,
+        canViewAnalytics: false,
+        canManageLoyalty: false,
+        canAccessWhatsApp: false,
+        canViewExpenses: false,
+        canBulkOperations: true,
     }
 }
 

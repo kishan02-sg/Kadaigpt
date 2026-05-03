@@ -20,6 +20,7 @@ class UserRole(str, enum.Enum):
     OWNER = "owner"
     MANAGER = "manager"
     CASHIER = "cashier"
+    INVENTORY_MANAGER = "inventory_manager"
 
 
 class BillStatus(str, enum.Enum):
@@ -92,6 +93,7 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     phone = Column(String(20), unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
+    staff_id = Column(String(20), unique=True, index=True, nullable=True)  # For staff login (e.g., KDG-4821)
     
     # Profile
     full_name = Column(String(200), nullable=False)

@@ -260,6 +260,56 @@ class ApiService {
         localStorage.removeItem('kadai_demo_mode')
         localStorage.removeItem('kadai_store_address')
         localStorage.removeItem('kadai_store_phone')
+        localStorage.removeItem('kadai_user_role')
+    }
+
+    // Staff login via unique Staff ID (not email)
+    async staffLogin(staffId, password) {
+        const response = await fetch(`${this.baseUrl}/auth/staff-login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ staff_id: staffId, password }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+            if (Array.isArray(data.detail)) {
+                const messages = data.detail.map(err => err.msg || err.message || JSON.stringify(err))
+                throw new Error(messages.join(', '))
+            }
+            throw new Error(typeof data.detail === 'string' ? data.detail : 'Staff login failed')
+        }
+
+        this.setToken(data.access_token)
+        return data
+    }
+
+    // Create a new staff member (Owner/Manager only)
+    async createStaff(fullName, role, phone = null) {
+        return this.request('/auth/create-staff', {
+            method: 'POST',
+            body: JSON.stringify({ full_name: fullName, role, phone }),
+        })
+    }
+
+    // List all staff in current store
+    async listStaff() {
+        return this.request('/auth/staff/list')
+    }
+
+    // Deactivate/activate a staff member
+    async toggleStaffStatus(staffUserId) {
+        return this.request(`/auth/staff/${staffUserId}`, {
+            method: 'DELETE',
+        })
+    }
+
+    // Change password
+    async changePassword(currentPassword, newPassword) {
+        return this.request(`/auth/change-password?current_password=${encodeURIComponent(currentPassword)}&new_password=${encodeURIComponent(newPassword)}`, {
+            method: 'PUT',
+        })
     }
 
     // Dashboard endpoints

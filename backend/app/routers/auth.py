@@ -386,3 +386,257 @@ async def reset_password(
         "message": "Password reset successfully. You can now login with your new password.",
         "success": True
     }
+
+
+# ═══════════════════════════════════════════
+# STAFF LOGIN & MANAGEMENT ENDPOINTS
+# ═══════════════════════════════════════════
+
+class StaffLoginRequest(BaseModel):
+    staff_id: str
+    password: str
+
+
+class CreateStaffRequest(BaseModel):
+    full_name: str = Field(..., min_length=2)
+    role: str = Field(..., description="manager, cashier, or inventory_manager")
+    phone: Optional[str] = None
+
+
+def generate_staff_id() -> str:
+    """Generate a unique staff ID like KDG-4821"""
+    import random
+    return f"KDG-{random.randint(1000, 9999)}"
+
+
+@router.post("/staff-login", response_model=Token)
+async def staff_login(
+    request: StaffLoginRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Login with Staff ID and password (for Manager, Cashier, Inventory Manager)
+    """
+    staff_id = request.staff_id.upper().strip()
+
+    # Check account lockout
+    lockout = _failed_attempts.get(staff_id)
+    if lockout and lockout.get('locked_until'):
+        if datetime.utcnow() < lockout['locked_until']:
+            remaining = int((lockout['locked_until'] - datetime.utcnow()).total_seconds())
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Account locked. Try again in {remaining} seconds."
+            )
+        else:
+            _failed_attempts.pop(staff_id, None)
+
+    # Find user by staff_id
+    result = await db.execute(select(User).where(User.staff_id == staff_id))
+    user = result.scalar_one_or_none()
+
+    if not user or not verify_password(request.password, user.password_hash):
+        # Track failed attempt
+        if staff_id not in _failed_attempts:
+            _failed_attempts[staff_id] = {'count': 0, 'locked_until': None}
+        _failed_attempts[staff_id]['count'] += 1
+        attempts = _failed_attempts[staff_id]['count']
+
+        if attempts >= MAX_LOGIN_ATTEMPTS:
+            _failed_attempts[staff_id]['locked_until'] = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Too many failed attempts. Account locked for {LOCKOUT_MINUTES} minutes."
+            )
+
+        remaining = MAX_LOGIN_ATTEMPTS - attempts
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Staff ID or password. {remaining} attempt(s) remaining.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account is inactive. Contact your manager."
+        )
+
+    # Successful login — clear failed attempts
+    _failed_attempts.pop(staff_id, None)
+
+    # Update last login
+    user.last_login = datetime.utcnow()
+    await db.commit()
+
+    # Generate token
+    access_token = create_access_token(data={"sub": str(user.id)})
+
+    return Token(access_token=access_token, token_type="bearer")
+
+
+@router.post("/create-staff", response_model=dict)
+async def create_staff(
+    request: CreateStaffRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a new staff member (Owner or Manager only).
+    Generates a unique Staff ID for them to login with.
+    Staff sets their own password on first login.
+    """
+    # Only owner or manager can create staff
+    if current_user.role not in (UserRole.OWNER, UserRole.MANAGER):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Owner or Manager can create staff accounts"
+        )
+
+    # Validate role
+    valid_roles = {"manager": UserRole.MANAGER, "cashier": UserRole.CASHIER, "inventory_manager": UserRole.INVENTORY_MANAGER}
+    if request.role.lower() not in valid_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role. Must be one of: {', '.join(valid_roles.keys())}"
+        )
+
+    # Manager cannot create other managers
+    if current_user.role == UserRole.MANAGER and request.role.lower() == "manager":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Managers cannot create other manager accounts. Only the owner can."
+        )
+
+    # Generate unique staff ID (retry if collision)
+    for _ in range(10):
+        staff_id = generate_staff_id()
+        existing = await db.execute(select(User).where(User.staff_id == staff_id))
+        if not existing.scalar_one_or_none():
+            break
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not generate unique staff ID. Please try again."
+        )
+
+    # Create a temporary password (staff will change on first login)
+    temp_password = f"kadai{secrets.token_hex(3)}"
+
+    # Create user with same store as the creator
+    user = User(
+        store_id=current_user.store_id,
+        email=f"{staff_id.lower()}@staff.kadaigpt.local",  # Placeholder email for staff
+        password_hash=get_password_hash(temp_password),
+        full_name=request.full_name,
+        role=valid_roles[request.role.lower()],
+        staff_id=staff_id,
+        phone=request.phone,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info(f"[Staff] Created {request.role} '{request.full_name}' with ID: {staff_id} by user {current_user.id}")
+
+    return {
+        "message": f"Staff account created successfully",
+        "staff_id": staff_id,
+        "temporary_password": temp_password,
+        "role": request.role.lower(),
+        "full_name": request.full_name,
+        "note": "Share the Staff ID and temporary password with the staff member. They should change their password after first login."
+    }
+
+
+@router.put("/change-password")
+async def change_password(
+    current_password: str = "",
+    new_password: str = "",
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Change password for the current user"""
+    # For staff first login, current_password may be the temp password
+    if not verify_password(current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+
+    if len(new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be at least 6 characters"
+        )
+
+    current_user.password_hash = get_password_hash(new_password)
+    await db.commit()
+
+    return {"message": "Password changed successfully", "success": True}
+
+
+@router.get("/staff/list", response_model=list)
+async def list_staff(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all staff in the current user's store (Owner/Manager only)"""
+    if current_user.role not in (UserRole.OWNER, UserRole.MANAGER):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Owner or Manager can view staff list"
+        )
+
+    result = await db.execute(
+        select(User).where(
+            User.store_id == current_user.store_id,
+            User.id != current_user.id
+        )
+    )
+    staff = result.scalars().all()
+
+    return [
+        {
+            "id": s.id,
+            "full_name": s.full_name,
+            "role": s.role.value if s.role else "cashier",
+            "staff_id": s.staff_id,
+            "phone": s.phone,
+            "is_active": s.is_active,
+            "last_login": s.last_login.isoformat() if s.last_login else None,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+        }
+        for s in staff
+    ]
+
+
+@router.delete("/staff/{staff_user_id}")
+async def deactivate_staff(
+    staff_user_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Deactivate a staff member (Owner/Manager only)"""
+    if current_user.role not in (UserRole.OWNER, UserRole.MANAGER):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Owner or Manager can manage staff"
+        )
+
+    result = await db.execute(
+        select(User).where(
+            User.id == staff_user_id,
+            User.store_id == current_user.store_id
+        )
+    )
+    staff = result.scalar_one_or_none()
+
+    if not staff:
+        raise HTTPException(status_code=404, detail="Staff member not found")
+
+    staff.is_active = not staff.is_active
+    await db.commit()
+
+    status_text = "activated" if staff.is_active else "deactivated"
+    return {"message": f"Staff member {status_text} successfully", "is_active": staff.is_active}

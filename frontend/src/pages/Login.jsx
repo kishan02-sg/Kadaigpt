@@ -4,17 +4,17 @@ import api from '../services/api'
 
 export default function Login({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true)
+  const [loginTab, setLoginTab] = useState('owner') // 'owner' or 'staff'
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
-  const [registerType, setRegisterType] = useState('owner') // 'owner' or 'staff'
   const [form, setForm] = useState({
     username: '',
     email: '',
     password: '',
     storeName: '',
-    storeCode: '', // For staff joining existing store
+    staffId: '', // For staff login
   })
   // Forgot password state
   const [showForgotPassword, setShowForgotPassword] = useState(false)
@@ -35,91 +35,57 @@ export default function Login({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
-    setError('') // Clear any previous error
+    setError('')
 
     try {
       if (isLogin) {
-        // Login uses email
-        console.log('Attempting login with email:', form.email)
-        await api.login(form.email, form.password)
-        const user = await api.getProfile()
-        localStorage.setItem('kadai_user_role', user.role || 'owner')
-        onLogin(user)
-      } else {
-        // Register - differentiate between owner and staff
-        console.log('Attempting registration as:', registerType)
-
-        if (registerType === 'owner') {
-          // Store owner registration
-          const registerResult = await api.register({
-            full_name: form.username,
-            email: form.email,
-            password: form.password,
-            store_name: form.storeName,
-            role: 'owner'
-          })
-
-          if (registerResult.access_token) {
-            api.setToken(registerResult.access_token)
-            if (registerResult.store?.name) {
-              localStorage.setItem('kadai_store_name', registerResult.store.name)
-            }
-            localStorage.setItem('kadai_user_role', 'owner')
-
-            const user = {
-              id: registerResult.user?.id,
-              email: registerResult.user?.email,
-              full_name: registerResult.user?.full_name,
-              username: registerResult.user?.full_name || form.username,
-              store_name: registerResult.store?.name || form.storeName,
-              role: 'owner'
-            }
-            onLogin(user)
-          }
+        if (loginTab === 'staff') {
+          // Staff login via Staff ID
+          console.log('Attempting staff login with ID:', form.staffId)
+          await api.staffLogin(form.staffId, form.password)
+          const user = await api.getProfile()
+          localStorage.setItem('kadai_user_role', user.role || 'cashier')
+          onLogin(user)
         } else {
-          // Manager or Cashier registration - join existing store
-          const selectedRole = registerType // 'manager' or 'cashier'
-          const registerResult = await api.registerStaff?.({
-            full_name: form.username,
-            email: form.email,
-            password: form.password,
-            store_code: form.storeCode,
-            role: selectedRole
-          }) || await api.register({
-            full_name: form.username,
-            email: form.email,
-            password: form.password,
-            store_code: form.storeCode,
-            role: selectedRole
-          })
+          // Owner login via email
+          console.log('Attempting owner login with email:', form.email)
+          await api.login(form.email, form.password)
+          const user = await api.getProfile()
+          localStorage.setItem('kadai_user_role', user.role || 'owner')
+          onLogin(user)
+        }
+      } else {
+        // Registration — Owner only
+        console.log('Attempting owner registration')
+        const registerResult = await api.register({
+          full_name: form.username,
+          email: form.email,
+          password: form.password,
+          store_name: form.storeName,
+          role: 'owner'
+        })
 
-          if (registerResult.access_token) {
-            api.setToken(registerResult.access_token)
-            localStorage.setItem('kadai_user_role', selectedRole)
-
-            const user = {
-              id: registerResult.user?.id,
-              email: registerResult.user?.email,
-              full_name: registerResult.user?.full_name,
-              username: registerResult.user?.full_name || form.username,
-              store_name: registerResult.store?.name,
-              role: selectedRole
-            }
-            onLogin(user)
-          } else {
-            // Fallback login
-            await api.login(form.email, form.password)
-            const user = await api.getProfile()
-            localStorage.setItem('kadai_user_role', selectedRole)
-            onLogin({ ...user, role: selectedRole })
+        if (registerResult.access_token) {
+          api.setToken(registerResult.access_token)
+          if (registerResult.store?.name) {
+            localStorage.setItem('kadai_store_name', registerResult.store.name)
           }
+          localStorage.setItem('kadai_user_role', 'owner')
+
+          const user = {
+            id: registerResult.user?.id,
+            email: registerResult.user?.email,
+            full_name: registerResult.user?.full_name,
+            username: registerResult.user?.full_name || form.username,
+            store_name: registerResult.store?.name || form.storeName,
+            role: 'owner'
+          }
+          onLogin(user)
         }
       }
     } catch (err) {
       console.error('Auth error:', err)
-      // Handle different error formats
       let errorMessage = 'Something went wrong. Please try again.'
-
       if (typeof err === 'string') {
         errorMessage = err
       } else if (err?.message) {
@@ -127,7 +93,6 @@ export default function Login({ onLogin }) {
       } else if (err?.detail) {
         errorMessage = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail)
       }
-
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -189,46 +154,38 @@ export default function Login({ onLogin }) {
         {/* Right - Form */}
         <div className="login-form-section">
           <div className="form-container">
-            <h2>{isLogin ? 'Welcome Back!' : 'Get Started Free'}</h2>
+            <h2>{isLogin ? 'Welcome Back!' : 'Create Your Store'}</h2>
             <p className="form-subtitle">
-              {isLogin ? 'Sign in to your store account' : 'Create your AI-powered store in seconds'}
+              {isLogin
+                ? (loginTab === 'staff' ? 'Sign in with your Staff ID' : 'Sign in to your store account')
+                : 'Set up your AI-powered store in seconds'}
             </p>
+
+            {/* Owner / Staff Tab Switcher - Login only */}
+            {isLogin && (
+              <div className="login-tabs">
+                <button
+                  type="button"
+                  className={`login-tab ${loginTab === 'owner' ? 'active' : ''}`}
+                  onClick={() => { setLoginTab('owner'); setError('') }}
+                >
+                  <Building size={16} />
+                  <span>Owner</span>
+                </button>
+                <button
+                  type="button"
+                  className={`login-tab ${loginTab === 'staff' ? 'active' : ''}`}
+                  onClick={() => { setLoginTab('staff'); setError('') }}
+                >
+                  <Users size={16} />
+                  <span>Staff</span>
+                </button>
+              </div>
+            )}
 
             {error && <div className="error-alert">{error}</div>}
 
             <form onSubmit={handleSubmit}>
-              {/* Role Selector for Registration */}
-              {!isLogin && (
-                <div className="role-selector">
-                  <button
-                    type="button"
-                    className={`role-btn ${registerType === 'owner' ? 'active' : ''}`}
-                    onClick={() => setRegisterType('owner')}
-                  >
-                    <Building size={18} />
-                    <span>Store Owner</span>
-                    <small>Create new store</small>
-                  </button>
-                  <button
-                    type="button"
-                    className={`role-btn ${registerType === 'manager' ? 'active' : ''}`}
-                    onClick={() => setRegisterType('manager')}
-                  >
-                    <Shield size={18} />
-                    <span>Manager</span>
-                    <small>Join as manager</small>
-                  </button>
-                  <button
-                    type="button"
-                    className={`role-btn ${registerType === 'cashier' ? 'active' : ''}`}
-                    onClick={() => setRegisterType('cashier')}
-                  >
-                    <Users size={18} />
-                    <span>Cashier</span>
-                    <small>Join as staff</small>
-                  </button>
-                </div>
-              )}
 
               {/* For Registration - Show Full Name first */}
               {!isLogin && (
@@ -252,7 +209,8 @@ export default function Login({ onLogin }) {
                 </div>
               )}
 
-              {/* Email - Always shown */}
+              {/* Email - For owner login and registration */}
+              {(loginTab === 'owner' || !isLogin) && (
               <div className="form-group">
                 <label className="form-label" htmlFor="email">Email Address</label>
                 <div className="input-icon">
@@ -270,10 +228,33 @@ export default function Login({ onLogin }) {
                   />
                 </div>
               </div>
+              )}
 
+              {/* Staff ID - For staff login only */}
+              {isLogin && loginTab === 'staff' && (
+              <div className="form-group">
+                <label className="form-label" htmlFor="staffid">Staff ID</label>
+                <div className="input-icon">
+                  <Shield size={18} />
+                  <input
+                    type="text"
+                    id="staffid"
+                    name="staffid"
+                    className="form-input"
+                    placeholder="KDG-XXXX"
+                    autoComplete="username"
+                    value={form.staffId}
+                    onChange={(e) => setForm({ ...form, staffId: e.target.value.toUpperCase() })}
+                    required
+                    maxLength={10}
+                  />
+                </div>
+                <span className="password-hint">Enter the Staff ID given by your Owner/Manager</span>
+              </div>
+              )}
 
-              {/* Store Name - For Store Owners only */}
-              {!isLogin && registerType === 'owner' && (
+              {/* Store Name - For Registration only */}
+              {!isLogin && (
                 <div className="form-group">
                   <label className="form-label" htmlFor="storename">Store Name</label>
                   <div className="input-icon">
@@ -291,26 +272,6 @@ export default function Login({ onLogin }) {
                       minLength={2}
                     />
                   </div>
-                </div>
-              )}
-
-              {/* Store Code - For Staff joining existing store */}
-              {!isLogin && registerType === 'staff' && (
-                <div className="form-group">
-                  <label className="form-label">Store Code</label>
-                  <div className="input-icon">
-                    <Building size={18} />
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="Enter store code (from owner)"
-                      value={form.storeCode}
-                      onChange={(e) => setForm({ ...form, storeCode: e.target.value.toUpperCase() })}
-                      required
-                      maxLength={8}
-                    />
-                  </div>
-                  <span className="password-hint">Ask your store owner for the code</span>
                 </div>
               )}
 
@@ -393,19 +354,18 @@ export default function Login({ onLogin }) {
             </form>
 
             <p className="switch-mode">
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button onClick={toggleMode}>
-                {isLogin ? 'Sign Up Free' : 'Sign In'}
-              </button>
+              {isLogin ? (
+                loginTab === 'owner' ? (
+                  <>Don't have an account? <button onClick={toggleMode}>Sign Up Free</button></>
+                ) : (
+                  <span className="staff-note-text">
+                    <Shield size={14} /> Staff accounts are created by your Owner or Manager
+                  </span>
+                )
+              ) : (
+                <>Already have an account? <button onClick={toggleMode}>Sign In</button></>
+              )}
             </p>
-
-            {isLogin && (
-              <div className="admin-login-link">
-                <a href="#admin-login" onClick={(e) => { e.preventDefault(); window.location.hash = 'admin-login' }}>
-                  Admin Login →
-                </a>
-              </div>
-            )}
 
             {isLogin && (
               <p className="terms-text">
@@ -905,6 +865,61 @@ export default function Login({ onLogin }) {
           grid-template-columns: 1fr 1fr;
           gap: 12px;
           margin-bottom: 20px;
+        }
+
+        /* Login Tabs (Owner / Staff) */
+        .login-tabs {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 4px;
+          margin-bottom: 20px;
+          background: var(--bg-tertiary);
+          border-radius: 12px;
+          padding: 4px;
+          border: 1px solid var(--border-subtle);
+        }
+
+        .login-tab {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          padding: 12px 16px;
+          background: transparent;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: var(--text-tertiary);
+          transition: all 0.2s;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .login-tab:hover {
+          color: var(--text-primary);
+        }
+
+        .login-tab.active {
+          background: var(--primary-500);
+          color: white;
+          box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+        }
+
+        .login-tab.active svg {
+          color: white;
+        }
+
+        .staff-note-text {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: var(--text-tertiary);
+          font-size: 0.85rem;
+        }
+
+        .staff-note-text svg {
+          color: var(--primary-400);
         }
 
         .role-btn {

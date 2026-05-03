@@ -15,6 +15,7 @@ class UserRoleEnum(str, Enum):
     OWNER = "owner"
     MANAGER = "manager"
     CASHIER = "cashier"
+    INVENTORY_MANAGER = "inventory_manager"
 
 
 class PaymentMethodEnum(str, Enum):
@@ -73,6 +74,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     store_id: int
+    staff_id: Optional[str] = None
     is_active: bool
     language: str
     theme: str

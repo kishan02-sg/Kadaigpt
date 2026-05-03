@@ -3,19 +3,17 @@ import { Home, ShoppingCart, Package, Users, MoreHorizontal, X, FileText, BarCha
 import './MobileNav.css'
 
 // Role-specific navigation configurations
-// Based on mental model research:
-// - Cashier: "Bill machine" — billing first, minimal navigation
-// - Manager: "Staff checker" — staff + stock focus
-// - Owner: "Money tracker" — revenue + trends + everything
-// - Accountant: "GST data extractor" — reports + export
-// - Warehouse: "Stock in/out" — scan + inventory only
+// - Cashier: Billing first, minimal navigation
+// - Inventory Manager: Stock + suppliers focus
+// - Manager: Full access to everything
+// - Owner: Monitoring + oversight (no billing)
 
 const ROLE_NAV_CONFIGS = {
     cashier: {
         primary: [
-            { id: 'create-bill', icon: ShoppingCart, label: 'बिल बनाओ' },
-            { id: 'products', icon: Package, label: 'Products' },
+            { id: 'create-bill', icon: ShoppingCart, label: 'New Bill' },
             { id: 'bills', icon: FileText, label: 'Bills' },
+            { id: 'products', icon: Package, label: 'Products' },
             { id: 'customers', icon: Users, label: 'Customers' },
             { id: 'more', icon: MoreHorizontal, label: 'More' },
         ],
@@ -23,6 +21,15 @@ const ROLE_NAV_CONFIGS = {
             { id: 'ocr', label: '📷 Scan Bill' },
             { id: 'settings', label: '⚙️ Settings' },
         ]
+    },
+    inventory_manager: {
+        primary: [
+            { id: 'products', icon: Package, label: 'Products' },
+            { id: 'suppliers', icon: Truck, label: 'Suppliers' },
+            { id: 'bulk-operations', icon: Upload, label: 'Import' },
+            { id: 'settings', icon: Settings, label: 'Settings' },
+        ],
+        more: []
     },
     manager: {
         primary: [
@@ -35,24 +42,28 @@ const ROLE_NAV_CONFIGS = {
         more: [
             { id: 'bills', label: '📄 All Bills' },
             { id: 'customers', label: '👥 Customers' },
+            { id: 'suppliers', label: '🚚 Suppliers' },
             { id: 'staff', label: '👨‍💼 Staff' },
             { id: 'gst', label: '📋 GST Reports' },
             { id: 'expenses', label: '💰 Expenses' },
             { id: 'daily-summary', label: '📊 Daily Report' },
+            { id: 'ocr', label: '📷 Scan Bill' },
+            { id: 'bulk-operations', label: '📦 Import/Export' },
+            { id: 'ai-insights', label: '🤖 AI Insights' },
+            { id: 'whatsapp', label: '💬 WhatsApp' },
+            { id: 'loyalty', label: '⭐ Loyalty' },
             { id: 'settings', label: '⚙️ Settings' },
         ]
     },
     owner: {
         primary: [
             { id: 'dashboard', icon: Home, label: 'Home' },
-            { id: 'create-bill', icon: ShoppingCart, label: 'New Bill' },
-            { id: 'products', icon: Package, label: 'Inventory' },
+            { id: 'bills', icon: FileText, label: 'Bills' },
+            { id: 'products', icon: Package, label: 'Products' },
             { id: 'analytics', icon: BarChart3, label: 'Analytics' },
             { id: 'more', icon: MoreHorizontal, label: 'More' },
         ],
         more: [
-            { id: 'bills', label: '📄 All Bills' },
-            { id: 'ocr', label: '📷 Scan Bill' },
             { id: 'customers', label: '👥 Customers' },
             { id: 'suppliers', label: '🚚 Suppliers' },
             { id: 'staff', label: '👨‍💼 Staff' },
@@ -63,36 +74,7 @@ const ROLE_NAV_CONFIGS = {
             { id: 'ai-insights', label: '🤖 AI Insights' },
             { id: 'loyalty', label: '⭐ Loyalty' },
             { id: 'whatsapp', label: '💬 WhatsApp' },
-            { id: 'bulk-operations', label: '📦 Import/Export' },
             { id: 'subscription', label: '💎 Subscription' },
-            { id: 'settings', label: '⚙️ Settings' },
-        ]
-    },
-    accountant: {
-        primary: [
-            { id: 'dashboard', icon: Home, label: 'Home' },
-            { id: 'gst', icon: FileText, label: 'GST' },
-            { id: 'analytics', icon: BarChart3, label: 'Reports' },
-            { id: 'expenses', icon: Wallet, label: 'Expenses' },
-            { id: 'more', icon: MoreHorizontal, label: 'More' },
-        ],
-        more: [
-            { id: 'bills', label: '📄 All Bills' },
-            { id: 'daily-summary', label: '📊 Daily Report' },
-            { id: 'customers', label: '👥 Customers' },
-            { id: 'settings', label: '⚙️ Settings' },
-        ]
-    },
-    warehouse: {
-        primary: [
-            { id: 'products', icon: Package, label: 'Stock' },
-            { id: 'ocr', icon: ShoppingCart, label: 'Scan' },
-            { id: 'suppliers', icon: Truck, label: 'Suppliers' },
-            { id: 'bulk-operations', icon: Upload, label: 'Import' },
-            { id: 'more', icon: MoreHorizontal, label: 'More' },
-        ],
-        more: [
-            { id: 'dashboard', label: '🏠 Home' },
             { id: 'settings', label: '⚙️ Settings' },
         ]
     }
@@ -101,7 +83,7 @@ const ROLE_NAV_CONFIGS = {
 // Default fallback = owner config
 const getNavConfig = (role) => {
     const normalizedRole = (role || 'owner').toLowerCase()
-    // Map 'staff' to 'cashier' since they have the same mental model
+    // Map legacy 'staff' to 'cashier'
     if (normalizedRole === 'staff') return ROLE_NAV_CONFIGS.cashier
     return ROLE_NAV_CONFIGS[normalizedRole] || ROLE_NAV_CONFIGS.owner
 }

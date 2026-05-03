@@ -60,9 +60,7 @@ function App() {
     const getRoleDefaultPage = (role) => {
         const defaults = {
             cashier: 'create-bill',
-            staff: 'create-bill',
-            accountant: 'gst',
-            warehouse: 'products',
+            inventory_manager: 'products',
             manager: 'dashboard',
             owner: 'dashboard',
         }
@@ -223,26 +221,31 @@ function App() {
 
     const renderPage = () => {
         // ═══════════════════════════════════════════════════
-        // 🔐 ROLE-BASED PAGE ACCESS (BUG-003 fix)
-        // Prevent users from accessing pages above their role level
+        // 🔐 ROLE-BASED PAGE ACCESS
+        // Each role has a whitelist of allowed pages
         // ═══════════════════════════════════════════════════
-        const ownerOnlyPages = ['analytics', 'gst', 'whatsapp', 'suppliers', 'loyalty', 'ai-insights', 'expenses', 'daily-summary', 'bulk-operations', 'admin', 'subscription', 'stores']
-        const managerPages = ['analytics', 'gst', 'expenses', 'daily-summary', 'staff']
-        const cashierPages = ['dashboard', 'create-bill', 'bills', 'products', 'customers', 'ocr', 'settings']
+        const ROLE_PAGES = {
+            owner: ['dashboard', 'bills', 'products', 'customers', 'suppliers',
+                    'analytics', 'gst', 'daily-summary', 'staff', 'stores',
+                    'subscription', 'ai-insights', 'settings', 'whatsapp',
+                    'loyalty', 'expenses', 'privacy', 'terms'],
+            manager: ['dashboard', 'create-bill', 'bills', 'ocr', 'products',
+                      'customers', 'suppliers', 'analytics', 'gst', 'daily-summary',
+                      'expenses', 'staff', 'whatsapp', 'loyalty', 'ai-insights',
+                      'bulk-operations', 'settings', 'privacy', 'terms'],
+            cashier: ['create-bill', 'bills', 'products', 'customers', 'ocr', 'settings', 'privacy', 'terms'],
+            inventory_manager: ['products', 'suppliers', 'bulk-operations', 'settings', 'privacy', 'terms'],
+        }
 
-        if (userRole === 'cashier' || userRole === 'staff') {
-            if (!cashierPages.includes(currentPage)) {
-                addToast('🔒 Permission denied. Redirecting to your dashboard...', 'warning')
-                setTimeout(() => setCurrentPage(getRoleDefaultPage(userRole)), 100)
-                return null
-            }
-        } else if (userRole === 'manager') {
-            const managerAllowed = [...cashierPages, ...managerPages]
-            if (!managerAllowed.includes(currentPage) && ownerOnlyPages.includes(currentPage)) {
-                addToast('🔒 This feature requires owner access.', 'warning')
-                setTimeout(() => setCurrentPage('dashboard'), 100)
-                return null
-            }
+        const role = (userRole || 'owner').toLowerCase()
+        const allowedPages = ROLE_PAGES[role] || ROLE_PAGES.owner
+        const defaultPage = getRoleDefaultPage(role)
+
+        // Redirect if page not allowed for this role
+        if (!allowedPages.includes(currentPage) && currentPage !== 'admin') {
+            addToast('🔒 You don\'t have access to this page.', 'warning')
+            setTimeout(() => setCurrentPage(defaultPage), 100)
+            return null
         }
         // ═══════════════════════════════════════════════════
 
@@ -251,7 +254,7 @@ function App() {
             case 'bills': return <Bills addToast={addToast} setCurrentPage={setCurrentPage} />
             case 'create-bill': return <CreateBill addToast={addToast} setCurrentPage={setCurrentPage} />
             case 'ocr': return <OCRCapture addToast={addToast} setCurrentPage={setCurrentPage} />
-            case 'products': return <Products addToast={addToast} />
+            case 'products': return <Products addToast={addToast} userRole={userRole} />
             case 'analytics': return <Analytics addToast={addToast} />
             case 'customers': return <Customers addToast={addToast} />
             case 'gst': return <GSTReports addToast={addToast} />
@@ -274,7 +277,7 @@ function App() {
                     <div style={{ fontSize: '64px', marginBottom: '16px' }}>🔍</div>
                     <h2 style={{ fontSize: '24px', fontWeight: 800, marginBottom: '8px' }}>Page Not Found</h2>
                     <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>The page you're looking for doesn't exist.</p>
-                    <button onClick={() => setCurrentPage('dashboard')} style={{ padding: '12px 24px', borderRadius: '12px', background: 'var(--primary, #6366f1)', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer', fontSize: '14px' }}>← Go to Dashboard</button>
+                    <button onClick={() => setCurrentPage(defaultPage)} style={{ padding: '12px 24px', borderRadius: '12px', background: 'var(--primary, #6366f1)', color: 'white', border: 'none', fontWeight: 700, cursor: 'pointer', fontSize: '14px' }}>← Go to Dashboard</button>
                 </div>
             )
         }
@@ -282,70 +285,92 @@ function App() {
 
     // Role-based navigation items
     const getNavItems = () => {
-        const baseItems = [
-            { id: 'dashboard', label: 'Dashboard', icon: Home },
-            { id: 'create-bill', label: 'New Bill', icon: Plus, primary: true },
-            { id: 'bills', label: 'Bills', icon: FileText },
-            { id: 'products', label: 'Products', icon: Package },
-        ]
+        const role = (userRole || 'owner').toLowerCase()
 
-        // Cashier sees basic items + Customers
-        if (userRole === 'staff' || userRole === 'cashier') {
+        if (role === 'inventory_manager') {
             return [
-                ...baseItems,
+                { id: 'products', label: 'Products', icon: Package },
+                { id: 'suppliers', label: 'Suppliers', icon: Users },
+                { id: 'bulk-operations', label: 'Import/Export', icon: FileText },
+            ]
+        }
+
+        if (role === 'cashier') {
+            return [
+                { id: 'create-bill', label: 'New Bill', icon: Plus, primary: true },
+                { id: 'bills', label: 'Bills', icon: FileText },
+                { id: 'products', label: 'Products', icon: Package },
                 { id: 'customers', label: 'Customers', icon: Users },
             ]
         }
 
-        // Manager sees more + can manage staff
-        if (userRole === 'manager') {
+        if (role === 'manager') {
             return [
-                ...baseItems,
-                { id: 'customers', label: 'Customers', icon: Users },
+                { id: 'dashboard', label: 'Dashboard', icon: Home },
+                { id: 'create-bill', label: 'New Bill', icon: Plus, primary: true },
+                { id: 'products', label: 'Products', icon: Package },
                 { id: 'analytics', label: 'Analytics', icon: BarChart3 },
             ]
         }
 
-        // Owner sees everything
+        // Owner — monitoring focused, no create-bill
         return [
-            ...baseItems,
+            { id: 'dashboard', label: 'Dashboard', icon: Home },
+            { id: 'bills', label: 'Bills', icon: FileText },
+            { id: 'products', label: 'Products', icon: Package },
             { id: 'customers', label: 'Customers', icon: Users },
             { id: 'analytics', label: 'Analytics', icon: BarChart3 },
         ]
     }
 
     const getMoreItems = () => {
-        // Cashier sees nothing in more menu
-        if (userRole === 'staff' || userRole === 'cashier') {
-            return []
+        const role = (userRole || 'owner').toLowerCase()
+
+        if (role === 'inventory_manager') {
+            return [
+                { id: 'settings', label: 'Settings' },
+            ]
         }
 
-        // Manager sees some items + staff management
-        if (userRole === 'manager') {
+        if (role === 'cashier') {
             return [
+                { id: 'ocr', label: 'Scan Bill (OCR)' },
+                { id: 'settings', label: 'Settings' },
+            ]
+        }
+
+        if (role === 'manager') {
+            return [
+                { id: 'bills', label: 'Bills' },
+                { id: 'customers', label: 'Customers' },
+                { id: 'suppliers', label: 'Suppliers' },
                 { id: 'staff', label: 'Staff Management' },
                 { id: 'gst', label: 'GST Reports' },
                 { id: 'expenses', label: 'Expenses' },
                 { id: 'daily-summary', label: 'Daily Report' },
+                { id: 'ocr', label: 'Scan Bill (OCR)' },
+                { id: 'bulk-operations', label: 'Import/Export' },
+                { id: 'ai-insights', label: 'AI Insights' },
+                { id: 'whatsapp', label: 'WhatsApp' },
+                { id: 'loyalty', label: 'Loyalty' },
+                { id: 'settings', label: 'Settings' },
             ]
         }
 
-        // Owner sees all features
-        const ownerItems = [
+        // Owner
+        return [
+            { id: 'suppliers', label: 'Suppliers' },
+            { id: 'gst', label: 'GST Reports' },
+            { id: 'daily-summary', label: 'Daily Report' },
             { id: 'staff', label: 'Staff Management' },
             { id: 'stores', label: 'My Stores' },
-            { id: 'gst', label: 'GST Reports' },
-            { id: 'suppliers', label: 'Suppliers' },
-            { id: 'expenses', label: 'Expenses' },
-            { id: 'daily-summary', label: 'Daily Report' },
             { id: 'ai-insights', label: 'AI Insights' },
+            { id: 'expenses', label: 'Expenses' },
             { id: 'whatsapp', label: 'WhatsApp' },
             { id: 'loyalty', label: 'Loyalty' },
-            { id: 'bulk-operations', label: 'Import/Export' },
             { id: 'subscription', label: 'Subscription' },
+            { id: 'settings', label: 'Settings' },
         ]
-
-        return ownerItems
     }
 
     const navItems = getNavItems()
