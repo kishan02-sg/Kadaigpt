@@ -167,7 +167,7 @@ export default function Login({ onLogin }) {
                 <button
                   type="button"
                   className={`login-tab ${loginTab === 'owner' ? 'active' : ''}`}
-                  onClick={() => { setLoginTab('owner'); setError('') }}
+                  onClick={() => { setLoginTab('owner'); setError(''); setForm(f => ({ ...f, password: '', staffId: '' })) }}
                 >
                   <Building size={16} />
                   <span>Owner</span>
@@ -175,7 +175,7 @@ export default function Login({ onLogin }) {
                 <button
                   type="button"
                   className={`login-tab ${loginTab === 'staff' ? 'active' : ''}`}
-                  onClick={() => { setLoginTab('staff'); setError('') }}
+                  onClick={() => { setLoginTab('staff'); setError(''); setForm(f => ({ ...f, password: '', email: '' })) }}
                 >
                   <Users size={16} />
                   <span>Staff</span>
