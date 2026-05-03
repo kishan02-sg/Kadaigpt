@@ -209,7 +209,12 @@ class ApiService {
             body: formData,
         })
 
-        const data = await response.json()
+        let data
+        try {
+            data = await response.json()
+        } catch {
+            throw new Error('Server is starting up. Please wait a moment and try again.')
+        }
 
         if (!response.ok) {
             // Handle Pydantic validation errors (array format)
@@ -232,15 +237,18 @@ class ApiService {
             body: JSON.stringify(userData),
         })
 
-        const data = await response.json()
+        let data
+        try {
+            data = await response.json()
+        } catch {
+            throw new Error('Server is starting up. Please wait a moment and try again.')
+        }
 
         if (!response.ok) {
-            // Handle Pydantic validation errors (array format)
             if (Array.isArray(data.detail)) {
                 const messages = data.detail.map(err => err.msg || err.message || JSON.stringify(err))
                 throw new Error(messages.join(', '))
             }
-            // Handle string error messages
             throw new Error(typeof data.detail === 'string' ? data.detail : 'Registration failed')
         }
 
@@ -271,7 +279,12 @@ class ApiService {
             body: JSON.stringify({ staff_id: staffId, password }),
         })
 
-        const data = await response.json()
+        let data
+        try {
+            data = await response.json()
+        } catch {
+            throw new Error('Server is starting up. Please wait a moment and try again.')
+        }
 
         if (!response.ok) {
             if (Array.isArray(data.detail)) {
