@@ -1,35 +1,25 @@
 import { useState, useEffect } from 'react'
-import { Users, UserPlus, Trash2, Edit2, Shield, ShieldCheck, ShieldOff, Mail, Phone, Search, X, Check } from 'lucide-react'
+import { Users, UserPlus, Shield, ShieldCheck, ShieldOff, Phone, Search, X, Check, Copy, Key, AlertTriangle } from 'lucide-react'
 import api from '../services/api'
 
 export default function StaffManagement({ addToast }) {
     const [staff, setStaff] = useState([])
     const [isLoading, setIsLoading] = useState(true)
     const [showAddModal, setShowAddModal] = useState(false)
-    const [editingStaff, setEditingStaff] = useState(null)
     const [searchQuery, setSearchQuery] = useState('')
+    const [createdStaff, setCreatedStaff] = useState(null) // Shows the newly created staff's credentials
+    const [addLoading, setAddLoading] = useState(false)
 
     const [newStaff, setNewStaff] = useState({
-        name: '',
-        email: '',
-        phone: '',
+        full_name: '',
         role: 'cashier',
-        permissions: {
-            canCreateBills: true,
-            canViewProducts: true,
-            canEditProducts: false,
-            canViewCustomers: false,
-            canEditCustomers: false,
-            canViewReports: false,
-            canManageStaff: false
-        }
+        phone: '',
     })
 
-    // Demo staff data
-    const demoStaff = [
-        { id: 1, name: 'Ravi Kumar', email: 'ravi@store.com', phone: '9876543210', role: 'manager', status: 'active', lastActive: '2 hours ago' },
-        { id: 2, name: 'Priya S', email: 'priya@store.com', phone: '9876543211', role: 'cashier', status: 'active', lastActive: '10 mins ago' },
-        { id: 3, name: 'Arun M', email: 'arun@store.com', phone: '9876543212', role: 'cashier', status: 'inactive', lastActive: '2 days ago' },
+    const roles = [
+        { id: 'cashier', label: 'Cashier', description: 'Create bills, view products (read-only), view customers', color: '#3b82f6', icon: '🧾' },
+        { id: 'inventory_manager', label: 'Inventory Manager', description: 'Manage products & stock, suppliers, bulk import', color: '#f59e0b', icon: '📦' },
+        { id: 'manager', label: 'Manager', description: 'Full access — billing, products, analytics, staff', color: '#8b5cf6', icon: '👔' },
     ]
 
     useEffect(() => {
@@ -39,63 +29,66 @@ export default function StaffManagement({ addToast }) {
     const loadStaff = async () => {
         setIsLoading(true)
         try {
-            // Try to fetch from API, fallback to demo
-            const response = await api.getStaff?.() || demoStaff
-            setStaff(Array.isArray(response) ? response : demoStaff)
-        } catch {
-            setStaff(demoStaff)
+            const response = await api.listStaff()
+            setStaff(Array.isArray(response) ? response : [])
+        } catch (err) {
+            console.error('Failed to load staff:', err)
+            setStaff([])
         } finally {
             setIsLoading(false)
         }
     }
 
-    const roles = [
-        { id: 'cashier', label: 'Cashier', description: 'Can create bills and view products', color: '#3b82f6' },
-        { id: 'salesperson', label: 'Sales Person', description: 'Can create bills and manage customers', color: '#22c55e' },
-        { id: 'inventory', label: 'Inventory Manager', description: 'Can manage products and stock', color: '#f59e0b' },
-        { id: 'manager', label: 'Manager', description: 'Full access except staff management', color: '#8b5cf6' },
-    ]
-
-    const handleAddStaff = () => {
-        if (!newStaff.name || !newStaff.email) {
-            addToast('Please fill in name and email', 'error')
+    const handleAddStaff = async () => {
+        if (!newStaff.full_name || newStaff.full_name.length < 2) {
+            addToast('Please enter a valid name (min 2 characters)', 'error')
             return
         }
 
-        const staffMember = {
-            id: Date.now(),
-            ...newStaff,
-            status: 'active',
-            lastActive: 'Just now'
+        setAddLoading(true)
+        try {
+            const result = await api.createStaff({
+                full_name: newStaff.full_name,
+                role: newStaff.role,
+                phone: newStaff.phone || undefined,
+            })
+            // Show the generated Staff ID and temp password
+            setCreatedStaff(result)
+            addToast(`${newStaff.full_name} added as ${newStaff.role}!`, 'success')
+            setNewStaff({ full_name: '', role: 'cashier', phone: '' })
+            loadStaff()
+        } catch (err) {
+            addToast(err.message || 'Failed to create staff', 'error')
+        } finally {
+            setAddLoading(false)
         }
-
-        setStaff([...staff, staffMember])
-        setShowAddModal(false)
-        setNewStaff({ name: '', email: '', phone: '', role: 'cashier', permissions: {} })
-        addToast(`${newStaff.name} added to staff`, 'success')
     }
 
-    const handleRemoveStaff = (id) => {
-        const member = staff.find(s => s.id === id)
-        setStaff(staff.filter(s => s.id !== id))
-        addToast(`${member?.name} removed from staff`, 'info')
+    const handleToggleStatus = async (member) => {
+        try {
+            await api.toggleStaffStatus(member.id)
+            addToast(`${member.full_name || member.username} status updated`, 'success')
+            loadStaff()
+        } catch (err) {
+            addToast(err.message || 'Failed to update status', 'error')
+        }
     }
 
-    const handleToggleStatus = (id) => {
-        setStaff(staff.map(s => {
-            if (s.id === id) {
-                const newStatus = s.status === 'active' ? 'inactive' : 'active'
-                addToast(`${s.name} is now ${newStatus}`, 'success')
-                return { ...s, status: newStatus }
-            }
-            return s
-        }))
+    const copyToClipboard = (text) => {
+        navigator.clipboard.writeText(text)
+        addToast('Copied to clipboard!', 'success')
     }
 
-    const filteredStaff = staff.filter(s =>
-        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.email.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const filteredStaff = staff.filter(s => {
+        const name = (s.full_name || s.username || '').toLowerCase()
+        const staffId = (s.staff_id || '').toLowerCase()
+        const q = searchQuery.toLowerCase()
+        return name.includes(q) || staffId.includes(q)
+    })
+
+    const getRoleInfo = (role) => {
+        return roles.find(r => r.id === (role || '').toLowerCase()) || roles[0]
+    }
 
     return (
         <div className="staff-page">
@@ -103,9 +96,9 @@ export default function StaffManagement({ addToast }) {
             <div className="page-header">
                 <div>
                     <h1><Users size={28} /> Staff Management</h1>
-                    <p>Add, remove, and manage staff access to your store</p>
+                    <p>Create staff accounts with unique login IDs</p>
                 </div>
-                <button className="add-btn" onClick={() => setShowAddModal(true)}>
+                <button className="add-btn" onClick={() => { setShowAddModal(true); setCreatedStaff(null) }}>
                     <UserPlus size={18} />
                     Add Staff
                 </button>
@@ -116,7 +109,7 @@ export default function StaffManagement({ addToast }) {
                 <Search size={18} />
                 <input
                     type="text"
-                    placeholder="Search staff by name or email..."
+                    placeholder="Search by name or Staff ID..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -124,51 +117,49 @@ export default function StaffManagement({ addToast }) {
 
             {/* Staff List */}
             <div className="staff-list">
-                {filteredStaff.length > 0 ? filteredStaff.map(member => {
-                    const role = roles.find(r => r.id === member.role) || roles[0]
+                {isLoading ? (
+                    <div className="empty-state">
+                        <p>Loading staff...</p>
+                    </div>
+                ) : filteredStaff.length > 0 ? filteredStaff.map(member => {
+                    const roleInfo = getRoleInfo(member.role)
+                    const isActive = member.is_active !== false
                     return (
-                        <div key={member.id} className={`staff-card ${member.status}`}>
-                            <div className="staff-avatar" style={{ background: role.color + '20', color: role.color }}>
-                                {member.name.charAt(0).toUpperCase()}
+                        <div key={member.id} className={`staff-card ${isActive ? '' : 'inactive'}`}>
+                            <div className="staff-avatar" style={{ background: roleInfo.color + '20', color: roleInfo.color }}>
+                                {roleInfo.icon}
                             </div>
                             <div className="staff-info">
                                 <div className="staff-name">
-                                    {member.name}
-                                    <span className={`status-badge ${member.status}`}>
-                                        {member.status}
+                                    {member.full_name || member.username}
+                                    <span className={`status-badge ${isActive ? 'active' : 'inactive'}`}>
+                                        {isActive ? 'Active' : 'Inactive'}
                                     </span>
                                 </div>
+                                {member.staff_id && (
+                                    <div className="staff-id-display">
+                                        <Key size={12} />
+                                        <span className="sid">{member.staff_id}</span>
+                                        <button className="copy-mini" onClick={() => copyToClipboard(member.staff_id)} title="Copy ID">
+                                            <Copy size={10} />
+                                        </button>
+                                    </div>
+                                )}
                                 <div className="staff-meta">
-                                    <span><Mail size={12} /> {member.email}</span>
                                     {member.phone && <span><Phone size={12} /> {member.phone}</span>}
                                 </div>
                                 <div className="staff-role">
-                                    <Shield size={12} style={{ color: role.color }} />
-                                    {role.label}
-                                    <span className="last-active">• Last active: {member.lastActive}</span>
+                                    <Shield size={12} style={{ color: roleInfo.color }} />
+                                    {roleInfo.label}
                                 </div>
                             </div>
                             <div className="staff-actions">
                                 <button
-                                    className={`action-btn ${member.status === 'active' ? 'deactivate' : 'activate'}`}
-                                    onClick={() => handleToggleStatus(member.id)}
-                                    title={member.status === 'active' ? 'Deactivate' : 'Activate'}
+                                    className={`action-btn ${isActive ? 'deactivate' : 'activate'}`}
+                                    onClick={() => handleToggleStatus(member)}
+                                    title={isActive ? 'Deactivate' : 'Activate'}
                                 >
-                                    {member.status === 'active' ? <ShieldOff size={16} /> : <ShieldCheck size={16} />}
-                                </button>
-                                <button
-                                    className="action-btn edit"
-                                    onClick={() => setEditingStaff(member)}
-                                    title="Edit"
-                                >
-                                    <Edit2 size={16} />
-                                </button>
-                                <button
-                                    className="action-btn delete"
-                                    onClick={() => handleRemoveStaff(member.id)}
-                                    title="Remove"
-                                >
-                                    <Trash2 size={16} />
+                                    {isActive ? <ShieldOff size={16} /> : <ShieldCheck size={16} />}
                                 </button>
                             </div>
                         </div>
@@ -177,7 +168,7 @@ export default function StaffManagement({ addToast }) {
                     <div className="empty-state">
                         <Users size={48} />
                         <h3>No staff members yet</h3>
-                        <p>Add your first staff member to get started</p>
+                        <p>Create your first staff member — they'll get a unique login ID</p>
                         <button onClick={() => setShowAddModal(true)}>
                             <UserPlus size={18} /> Add Staff
                         </button>
@@ -192,7 +183,7 @@ export default function StaffManagement({ addToast }) {
                     {roles.map(role => (
                         <div key={role.id} className="role-card" style={{ borderColor: role.color }}>
                             <div className="role-icon" style={{ background: role.color + '20', color: role.color }}>
-                                <Shield size={20} />
+                                <span style={{ fontSize: '20px' }}>{role.icon}</span>
                             </div>
                             <div>
                                 <strong>{role.label}</strong>
@@ -205,71 +196,109 @@ export default function StaffManagement({ addToast }) {
 
             {/* Add Staff Modal */}
             {showAddModal && (
-                <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+                <div className="modal-overlay" onClick={() => { setShowAddModal(false); setCreatedStaff(null) }}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2><UserPlus size={20} /> Add New Staff</h2>
-                            <button className="close-btn" onClick={() => setShowAddModal(false)}>
+                            <h2><UserPlus size={20} /> {createdStaff ? 'Staff Created!' : 'Add New Staff'}</h2>
+                            <button className="close-btn" onClick={() => { setShowAddModal(false); setCreatedStaff(null) }}>
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="modal-body">
-                            <div className="form-group">
-                                <label>Full Name *</label>
-                                <input
-                                    type="text"
-                                    placeholder="Enter name"
-                                    value={newStaff.name}
-                                    onChange={e => setNewStaff({ ...newStaff, name: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Email *</label>
-                                <input
-                                    type="email"
-                                    placeholder="Enter email"
-                                    value={newStaff.email}
-                                    onChange={e => setNewStaff({ ...newStaff, email: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Phone</label>
-                                <input
-                                    type="tel"
-                                    placeholder="Enter phone number"
-                                    value={newStaff.phone}
-                                    onChange={e => setNewStaff({ ...newStaff, phone: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Role</label>
-                                <div className="role-options">
-                                    {roles.map(role => (
-                                        <label
-                                            key={role.id}
-                                            className={`role-option ${newStaff.role === role.id ? 'selected' : ''}`}
-                                            style={{ borderColor: newStaff.role === role.id ? role.color : 'transparent' }}
-                                        >
-                                            <input
-                                                type="radio"
-                                                name="role"
-                                                value={role.id}
-                                                checked={newStaff.role === role.id}
-                                                onChange={e => setNewStaff({ ...newStaff, role: e.target.value })}
-                                            />
-                                            <Shield size={16} style={{ color: role.color }} />
-                                            <span>{role.label}</span>
-                                        </label>
-                                    ))}
+
+                        {/* Show credentials after creation */}
+                        {createdStaff ? (
+                            <div className="modal-body">
+                                <div className="credentials-box">
+                                    <div className="cred-header">
+                                        <Check size={24} style={{ color: '#22c55e' }} />
+                                        <h3>Staff account created successfully!</h3>
+                                    </div>
+                                    <p className="cred-note">
+                                        <AlertTriangle size={14} /> Share these credentials with the staff member. The password should be changed on first login.
+                                    </p>
+                                    <div className="cred-row">
+                                        <label>Staff ID</label>
+                                        <div className="cred-value">
+                                            <span className="staff-id-big">{createdStaff.staff_id}</span>
+                                            <button onClick={() => copyToClipboard(createdStaff.staff_id)}><Copy size={14} /> Copy</button>
+                                        </div>
+                                    </div>
+                                    <div className="cred-row">
+                                        <label>Temporary Password</label>
+                                        <div className="cred-value">
+                                            <span className="temp-pass">{createdStaff.temporary_password}</span>
+                                            <button onClick={() => copyToClipboard(createdStaff.temporary_password)}><Copy size={14} /> Copy</button>
+                                        </div>
+                                    </div>
+                                    <div className="cred-row">
+                                        <label>Role</label>
+                                        <div className="cred-value">
+                                            <span>{getRoleInfo(createdStaff.role).label}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="btn-primary" onClick={() => { setShowAddModal(false); setCreatedStaff(null) }}>
+                                        Done
+                                    </button>
                                 </div>
                             </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-                            <button className="btn-primary" onClick={handleAddStaff}>
-                                <Check size={18} /> Add Staff
-                            </button>
-                        </div>
+                        ) : (
+                            <>
+                                <div className="modal-body">
+                                    <div className="form-group">
+                                        <label>Full Name *</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter staff member's name"
+                                            value={newStaff.full_name}
+                                            onChange={e => setNewStaff({ ...newStaff, full_name: e.target.value })}
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Phone</label>
+                                        <input
+                                            type="tel"
+                                            placeholder="Enter phone number"
+                                            value={newStaff.phone}
+                                            onChange={e => setNewStaff({ ...newStaff, phone: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Role *</label>
+                                        <div className="role-options">
+                                            {roles.map(role => (
+                                                <label
+                                                    key={role.id}
+                                                    className={`role-option ${newStaff.role === role.id ? 'selected' : ''}`}
+                                                    style={{ borderColor: newStaff.role === role.id ? role.color : 'transparent' }}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="role"
+                                                        value={role.id}
+                                                        checked={newStaff.role === role.id}
+                                                        onChange={e => setNewStaff({ ...newStaff, role: e.target.value })}
+                                                    />
+                                                    <span style={{ fontSize: '16px' }}>{role.icon}</span>
+                                                    <div>
+                                                        <span className="role-name">{role.label}</span>
+                                                        <span className="role-desc">{role.description}</span>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
+                                    <button className="btn-primary" onClick={handleAddStaff} disabled={addLoading}>
+                                        {addLoading ? 'Creating...' : <><Check size={18} /> Create Staff</>}
+                                    </button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
@@ -349,7 +378,6 @@ export default function StaffManagement({ addToast }) {
           align-items: center;
           justify-content: center;
           font-size: 1.25rem;
-          font-weight: 700;
         }
 
         .staff-info { flex: 1; }
@@ -371,12 +399,36 @@ export default function StaffManagement({ addToast }) {
         .status-badge.active { background: #22c55e20; color: #22c55e; }
         .status-badge.inactive { background: #ef444420; color: #ef4444; }
 
+        .staff-id-display {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 3px 10px;
+          background: var(--bg-tertiary);
+          border: 1px solid var(--border-subtle);
+          border-radius: 6px;
+          font-size: 0.8rem;
+          margin-bottom: 4px;
+        }
+        .staff-id-display .sid {
+          font-family: 'Courier New', monospace;
+          font-weight: 700;
+          color: var(--primary-400);
+          letter-spacing: 1px;
+        }
+        .copy-mini {
+          background: none; border: none; cursor: pointer;
+          color: var(--text-tertiary); padding: 2px;
+          display: flex; align-items: center;
+        }
+        .copy-mini:hover { color: var(--primary-400); }
+
         .staff-meta {
           display: flex;
           gap: 16px;
           font-size: 0.8rem;
           color: var(--text-tertiary);
-          margin-bottom: 6px;
+          margin-bottom: 4px;
         }
         .staff-meta span { display: flex; align-items: center; gap: 4px; }
 
@@ -387,7 +439,6 @@ export default function StaffManagement({ addToast }) {
           font-size: 0.8rem;
           color: var(--text-secondary);
         }
-        .last-active { color: var(--text-tertiary); }
 
         .staff-actions { display: flex; gap: 8px; }
         .action-btn {
@@ -404,7 +455,6 @@ export default function StaffManagement({ addToast }) {
           transition: all 0.2s;
         }
         .action-btn:hover { border-color: var(--primary-400); color: var(--primary-400); }
-        .action-btn.delete:hover { border-color: #ef4444; color: #ef4444; }
         .action-btn.activate:hover { border-color: #22c55e; color: #22c55e; }
         .action-btn.deactivate:hover { border-color: #f59e0b; color: #f59e0b; }
 
@@ -437,7 +487,7 @@ export default function StaffManagement({ addToast }) {
           padding: 24px;
         }
         .permissions-info h3 { margin: 0 0 16px; font-size: 1rem; }
-        .roles-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+        .roles-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
         .role-card {
           display: flex;
           align-items: flex-start;
@@ -458,6 +508,52 @@ export default function StaffManagement({ addToast }) {
         .role-card strong { display: block; margin-bottom: 4px; }
         .role-card p { margin: 0; font-size: 0.8rem; color: var(--text-tertiary); }
 
+        /* Credentials Box */
+        .credentials-box {
+          background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.02));
+          border: 1px solid rgba(34, 197, 94, 0.3);
+          border-radius: 16px;
+          padding: 24px;
+        }
+        .cred-header {
+          display: flex; align-items: center; gap: 10px;
+          margin-bottom: 12px;
+        }
+        .cred-header h3 { margin: 0; font-size: 1.1rem; color: #22c55e; }
+        .cred-note {
+          display: flex; align-items: center; gap: 6px;
+          font-size: 0.8rem; color: #f59e0b;
+          margin-bottom: 20px; padding: 10px 14px;
+          background: rgba(245, 158, 11, 0.1);
+          border-radius: 8px;
+        }
+        .cred-row {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 14px 0;
+          border-bottom: 1px solid var(--border-subtle);
+        }
+        .cred-row:last-child { border-bottom: none; }
+        .cred-row label { font-size: 0.85rem; color: var(--text-tertiary); font-weight: 500; }
+        .cred-value { display: flex; align-items: center; gap: 10px; }
+        .staff-id-big {
+          font-family: 'Courier New', monospace;
+          font-size: 1.4rem; font-weight: 800;
+          color: var(--primary-400);
+          letter-spacing: 2px;
+        }
+        .temp-pass {
+          font-family: 'Courier New', monospace;
+          font-size: 1.1rem; font-weight: 600;
+          color: var(--text-primary);
+        }
+        .cred-value button {
+          display: inline-flex; align-items: center; gap: 4px;
+          padding: 6px 12px; background: var(--bg-tertiary);
+          border: 1px solid var(--border-subtle); border-radius: 6px;
+          font-size: 0.75rem; cursor: pointer; color: var(--text-secondary);
+        }
+        .cred-value button:hover { border-color: var(--primary-400); color: var(--primary-400); }
+
         /* Modal */
         .modal-overlay {
           position: fixed;
@@ -474,7 +570,7 @@ export default function StaffManagement({ addToast }) {
           background: var(--bg-secondary);
           border-radius: 20px;
           width: 100%;
-          max-width: 480px;
+          max-width: 520px;
           max-height: 90vh;
           overflow-y: auto;
         }
@@ -500,8 +596,9 @@ export default function StaffManagement({ addToast }) {
         }
         .modal-body { padding: 24px; }
         .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9rem; }
-        .form-group input {
+        .form-group > label { display: block; margin-bottom: 8px; font-weight: 500; font-size: 0.9rem; }
+        .form-group input[type="text"],
+        .form-group input[type="tel"] {
           width: 100%;
           padding: 12px 16px;
           border: 1px solid var(--border-subtle);
@@ -509,24 +606,27 @@ export default function StaffManagement({ addToast }) {
           background: var(--bg-tertiary);
           color: var(--text-primary);
           font-size: 0.9rem;
+          box-sizing: border-box;
         }
         .form-group input:focus { border-color: var(--primary-400); outline: none; }
 
-        .role-options { display: flex; flex-wrap: wrap; gap: 10px; }
+        .role-options { display: flex; flex-direction: column; gap: 10px; }
         .role-option {
           display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 10px 14px;
+          align-items: flex-start;
+          gap: 10px;
+          padding: 14px 16px;
           background: var(--bg-tertiary);
           border: 2px solid var(--border-subtle);
-          border-radius: 10px;
+          border-radius: 12px;
           cursor: pointer;
           transition: all 0.2s;
         }
         .role-option input { display: none; }
         .role-option.selected { background: var(--bg-card); }
-        .role-option span { font-size: 0.85rem; }
+        .role-option div { display: flex; flex-direction: column; }
+        .role-name { font-weight: 600; font-size: 0.9rem; }
+        .role-desc { font-size: 0.75rem; color: var(--text-tertiary); margin-top: 2px; }
 
         .modal-footer {
           display: flex;
@@ -555,6 +655,7 @@ export default function StaffManagement({ addToast }) {
           font-weight: 500;
           cursor: pointer;
         }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
         @media (max-width: 640px) {
           .page-header { flex-direction: column; gap: 16px; }
@@ -564,6 +665,7 @@ export default function StaffManagement({ addToast }) {
           .staff-name { justify-content: center; }
           .staff-meta { justify-content: center; flex-wrap: wrap; }
           .staff-role { justify-content: center; }
+          .staff-id-display { justify-content: center; }
         }
       `}</style>
         </div>

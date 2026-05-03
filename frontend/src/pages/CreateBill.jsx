@@ -30,10 +30,45 @@ export default function CreateBill({ addToast, setCurrentPage }) {
   const [usingDemoData, setUsingDemoData] = useState(false)
   const [showQtyModal, setShowQtyModal] = useState(null)
   const [showBarcodeInput, setShowBarcodeInput] = useState(false)
+  const [allCustomers, setAllCustomers] = useState([])
+  const [customerSuggestions, setCustomerSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
   useEffect(() => {
     loadProducts()
+    loadCustomers()
   }, [])
+
+  const loadCustomers = async () => {
+    try {
+      const customers = await api.getCustomers?.() || []
+      setAllCustomers(Array.isArray(customers) ? customers : [])
+    } catch (e) {
+      console.log('Could not preload customers:', e)
+    }
+  }
+
+  const handleCustomerNameChange = (value) => {
+    setCustomer({ ...customer, name: value })
+    if (value.length >= 2 && allCustomers.length > 0) {
+      const matches = allCustomers.filter(c =>
+        (c.name || '').toLowerCase().includes(value.toLowerCase())
+      ).slice(0, 5)
+      setCustomerSuggestions(matches)
+      setShowSuggestions(matches.length > 0)
+    } else {
+      setCustomerSuggestions([])
+      setShowSuggestions(false)
+    }
+  }
+
+  const selectCustomerSuggestion = (c) => {
+    setCustomer({ name: c.name, phone: c.phone || '' })
+    setExistingCustomer(c)
+    setCustomerSuggestions([])
+    setShowSuggestions(false)
+    addToast?.(`Welcome back, ${c.name}! ${c.loyalty_points || 0} points available`, 'success')
+  }
 
   const loadProducts = async () => {
     setLoading(true)
@@ -673,8 +708,26 @@ export default function CreateBill({ addToast, setCurrentPage }) {
               }}
               style={customer.phone.length > 0 && customer.phone.length < 10 ? { borderColor: '#f59e0b' } : customer.phone.length === 10 ? { borderColor: '#22c55e' } : {}}
             />
-            <input type="text" placeholder="👤 Name" value={customer.name}
-              onChange={(e) => setCustomer({ ...customer, name: e.target.value })} />
+            <div className="name-suggest-wrap" style={{ position: 'relative', flex: 1 }}>
+              <input type="text" placeholder="👤 Name" value={customer.name}
+                onChange={(e) => handleCustomerNameChange(e.target.value)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                onFocus={() => { if (customerSuggestions.length > 0) setShowSuggestions(true) }}
+              />
+              {showSuggestions && customerSuggestions.length > 0 && (
+                <div className="customer-suggestions">
+                  {customerSuggestions.map(c => (
+                    <div key={c.id || c.phone} className="suggest-item" onMouseDown={() => selectCustomerSuggestion(c)}>
+                      <div className="suggest-name">{c.name}</div>
+                      <div className="suggest-meta">
+                        {c.phone && <span>📱 {c.phone}</span>}
+                        <span>⭐ {c.loyalty_points || 0} pts</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             {existingCustomer && <span className="loyalty-tag">⭐{existingCustomer.loyalty_points || 0}</span>}
           </div>
 
@@ -1148,6 +1201,26 @@ export default function CreateBill({ addToast, setCurrentPage }) {
           padding: 4px 8px; border-radius: 6px;
           font-size: 0.7rem; font-weight: 700;
           white-space: nowrap; flex-shrink: 0;
+        }
+        .name-suggest-wrap input { width: 100%; }
+        .customer-suggestions {
+          position: absolute; top: 100%; left: 0; right: 0;
+          background: var(--bg-card); border: 1px solid var(--primary-400);
+          border-radius: 10px; z-index: 50; max-height: 200px;
+          overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+          margin-top: 4px;
+        }
+        .suggest-item {
+          padding: 10px 14px; cursor: pointer;
+          border-bottom: 1px solid var(--border-subtle);
+          transition: background 0.15s;
+        }
+        .suggest-item:last-child { border-bottom: none; }
+        .suggest-item:hover { background: var(--bg-tertiary); }
+        .suggest-name { font-weight: 600; font-size: 0.85rem; }
+        .suggest-meta {
+          display: flex; gap: 12px; font-size: 0.72rem;
+          color: var(--text-tertiary); margin-top: 2px;
         }
         
         /* ═══ ITEMS LIST — HERO AREA — flex:1 ═══ */
