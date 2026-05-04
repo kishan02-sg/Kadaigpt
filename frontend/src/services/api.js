@@ -271,6 +271,11 @@ class ApiService {
         localStorage.removeItem('kadai_user_role')
     }
 
+    // Get current user profile (called after login)
+    async getProfile() {
+        return this.request('/auth/me')
+    }
+
     // Staff login via unique Staff ID (not email)
     async staffLogin(staffId, password) {
         const response = await fetch(`${this.baseUrl}/auth/staff-login`, {
