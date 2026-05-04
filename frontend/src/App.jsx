@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { ShoppingCart, Home, FileText, Package, BarChart3, Users, Settings as SettingsIcon, Plus, Command, LogOut, Menu, X, Bell, User, ChevronDown, Star } from 'lucide-react'
+import { ShoppingCart, Settings as SettingsIcon, Command, LogOut, Menu, X, Bell, User, ChevronDown } from 'lucide-react'
 import MobileNav from './components/MobileNav'
 import OnboardingWizard from './components/OnboardingWizard'
 import CommandPalette from './components/CommandPalette'
@@ -51,67 +51,13 @@ import './styles/ux-rules.css'
 // Initialize error tracking on app load
 errorTracker.init()
 
-// ═══════════════════════════════════════════════════════════════
-// ROLE CONFIG — Single source of truth for owner vs staff roles
-// Each role: defaultPage, label, nav (exactly 5 items)
-// ═══════════════════════════════════════════════════════════════
-const ROLE_CONFIG = {
-    owner: {
-        label: 'Owner',
-        defaultPage: 'dashboard',
-        nav: [
-            { id: 'dashboard', label: 'Dashboard', icon: Home },
-            { id: 'bills',     label: 'Bills',     icon: FileText },
-            { id: 'products',  label: 'Products',  icon: Package },
-            { id: 'analytics', label: 'Analytics',  icon: BarChart3 },
-            { id: 'staff',     label: 'Staff',     icon: Users },
-        ],
-    },
-    manager: {
-        label: 'Manager',
-        defaultPage: 'dashboard',
-        nav: [
-            { id: 'dashboard',   label: 'Dashboard', icon: Home },
-            { id: 'create-bill', label: 'New Bill',  icon: Plus, primary: true },
-            { id: 'products',    label: 'Products',  icon: Package },
-            { id: 'analytics',   label: 'Analytics', icon: BarChart3 },
-            { id: 'staff',       label: 'Staff',     icon: Users },
-        ],
-    },
-    cashier: {
-        label: 'Cashier',
-        defaultPage: 'create-bill',
-        nav: [
-            { id: 'create-bill', label: 'New Bill',   icon: Plus, primary: true },
-            { id: 'bills',       label: 'Bills',      icon: FileText },
-            { id: 'products',    label: 'Products',   icon: Package },
-            { id: 'customers',   label: 'Customers',  icon: Users },
-            { id: 'loyalty',     label: 'Loyalty',    icon: Star },
-        ],
-    },
-    inventory_manager: {
-        label: 'Inventory',
-        defaultPage: 'products',
-        nav: [
-            { id: 'products',        label: 'Products',     icon: Package },
-            { id: 'suppliers',       label: 'Suppliers',    icon: Users },
-            { id: 'bulk-operations', label: 'Import/Export', icon: FileText },
-            { id: 'analytics',       label: 'Analytics',    icon: BarChart3 },
-            { id: 'settings',        label: 'Settings',     icon: SettingsIcon },
-        ],
-    },
-}
+import { getRoleConfig, getRoleDefaultPage, VALID_PAGES } from './config/roles'
 
 function App() {
-    const getRoleDefaultPage = (role) => {
-        return ROLE_CONFIG[(role || 'owner').toLowerCase()]?.defaultPage || 'dashboard'
-    }
-
     const getInitialPage = () => {
         const hash = window.location.hash.replace('#', '')
-        const validPages = ['dashboard', 'bills', 'create-bill', 'ocr', 'products', 'analytics', 'customers', 'gst', 'whatsapp', 'suppliers', 'loyalty', 'ai-insights', 'expenses', 'daily-summary', 'bulk-operations', 'admin', 'settings', 'staff', 'stores', 'subscription', 'admin-login', 'privacy', 'terms']
         const savedRole = localStorage.getItem('kadai_user_role') || 'owner'
-        return validPages.includes(hash) ? hash : getRoleDefaultPage(savedRole)
+        return VALID_PAGES.includes(hash) ? hash : getRoleDefaultPage(savedRole)
     }
 
     const [currentPage, setCurrentPageState] = useState(getInitialPage)
@@ -328,9 +274,8 @@ function App() {
         }
     }
 
-    // Navigation — driven by ROLE_CONFIG (clean, no if-else chains)
-    const roleKey = (userRole || 'owner').toLowerCase()
-    const roleConfig = ROLE_CONFIG[roleKey] || ROLE_CONFIG.owner
+    // Navigation — driven by config/roles.js (clean, no if-else chains)
+    const roleConfig = getRoleConfig(userRole)
     const navItems = roleConfig.nav
     const moreItems = [] // No dropdown — all 5 items in one row
 
