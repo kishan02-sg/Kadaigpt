@@ -44,15 +44,30 @@ export default function Login({ onLogin }) {
           // Staff login via Staff ID
           console.log('Attempting staff login with ID:', form.staffId)
           await api.staffLogin(form.staffId, form.password)
-          const user = await api.getProfile()
+          // Fetch profile — if it fails, still login with basic info
+          let user
+          try {
+            user = await api.getProfile()
+          } catch (profileErr) {
+            console.warn('Profile fetch failed, using fallback:', profileErr)
+            user = { full_name: form.staffId, role: 'cashier', staff_id: form.staffId }
+          }
           localStorage.setItem('kadai_user_role', user.role || 'cashier')
+          if (user.store?.name) localStorage.setItem('kadai_store_name', user.store.name)
           onLogin(user)
         } else {
           // Owner login via email
           console.log('Attempting owner login with email:', form.email)
           await api.login(form.email, form.password)
-          const user = await api.getProfile()
+          let user
+          try {
+            user = await api.getProfile()
+          } catch (profileErr) {
+            console.warn('Profile fetch failed, using fallback:', profileErr)
+            user = { email: form.email, role: 'owner', full_name: form.email }
+          }
           localStorage.setItem('kadai_user_role', user.role || 'owner')
+          if (user.store?.name) localStorage.setItem('kadai_store_name', user.store.name)
           onLogin(user)
         }
       } else {

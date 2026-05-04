@@ -156,9 +156,9 @@ class ApiService {
                 const data = await response.json().catch(() => ({}))
                 console.error('[API] 401 Error on', endpoint, 'Details:', data)
 
-                // Only clear token if it's an auth validation failure, not just missing token
-                // Don't clear on login/register endpoints as those fail for different reasons
-                if (!endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
+                // Only clear token if it's an auth validation failure on protected endpoints
+                // Don't clear on login/register/staff-login/me endpoints
+                if (!endpoint.includes('/auth/')) {
                     console.log('[API] Clearing token due to 401 on protected endpoint')
                     this.setToken(null)
                 }
