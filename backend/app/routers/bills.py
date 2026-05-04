@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import uuid
 
 from app.database import get_db
-from app.models import Bill, BillItem, Product, User, Store, BillStatus, PaymentMethod, UserRole
+from app.models import Bill, BillItem, Product, User, Store, Customer, BillStatus, PaymentMethod, UserRole
 from app.schemas import BillCreate, BillResponse, BillSummary, PrintRequest, PrintStatus
 from app.routers.auth import get_current_active_user
 from app.rbac import require_min_role
@@ -319,6 +319,42 @@ async def create_bill(
     
     await db.commit()
     await db.refresh(bill)
+    
+    # ⭐ LOYALTY POINTS: Auto-award points to customer (1 point per ₹10 spent)
+    if bill_data.customer_phone:
+        try:
+            cust_result = await db.execute(
+                select(Customer).where(
+                    Customer.store_id == current_user.store_id,
+                    Customer.phone == bill_data.customer_phone
+                )
+            )
+            customer = cust_result.scalar_one_or_none()
+            
+            points_earned = int(totals["total_amount"] / 10)  # 1 point per ₹10
+            
+            if customer:
+                # Existing customer — add points + update purchase total
+                customer.loyalty_points = (customer.loyalty_points or 0) + points_earned
+                customer.total_purchases = (customer.total_purchases or 0) + totals["total_amount"]
+                customer.last_purchase = datetime.utcnow()
+            else:
+                # New customer — auto-create from bill
+                customer = Customer(
+                    store_id=current_user.store_id,
+                    name=bill_data.customer_name or "Walk-in",
+                    phone=bill_data.customer_phone,
+                    loyalty_points=points_earned,
+                    total_purchases=totals["total_amount"],
+                    last_purchase=datetime.utcnow(),
+                    credit=0.0,
+                )
+                db.add(customer)
+            
+            await db.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Loyalty points update failed: {e}")
     
     # Get items for response
     items_result = await db.execute(
