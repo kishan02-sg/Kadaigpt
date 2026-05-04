@@ -369,6 +369,55 @@ class ApiService {
         return this.request('/dashboard/insights')
     }
 
+    // ==================== CUSTOMER ENDPOINTS ====================
+
+    async getCustomers(search = '') {
+        const params = search ? `?search=${encodeURIComponent(search)}` : ''
+        return this.request(`/customers${params}`)
+    }
+
+    async getCustomer(customerId) {
+        return this.request(`/customers/${customerId}`)
+    }
+
+    async createCustomer(data) {
+        return this.request('/customers', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        })
+    }
+
+    async updateCustomer(customerId, data) {
+        return this.request(`/customers/${customerId}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        })
+    }
+
+    async deleteCustomer(customerId) {
+        return this.request(`/customers/${customerId}`, {
+            method: 'DELETE',
+        })
+    }
+
+    async recordPayment(customerId, amount) {
+        return this.request(`/customers/${customerId}/payment`, {
+            method: 'POST',
+            body: JSON.stringify({ amount }),
+        })
+    }
+
+    async addCredit(customerId, amount, notes = '') {
+        return this.request(`/customers/${customerId}/credit`, {
+            method: 'POST',
+            body: JSON.stringify({ amount, notes }),
+        })
+    }
+
+    async getCustomerStats() {
+        return this.request('/customers/stats/summary')
+    }
+
     // Analytics endpoint
     async getAnalytics(period = 'week') {
         try {
