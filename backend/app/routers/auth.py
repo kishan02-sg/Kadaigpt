@@ -559,19 +559,47 @@ async def create_staff(
     # Create a temporary password (staff will change on first login)
     temp_password = f"kadai{secrets.token_hex(3)}"
 
+    # Clean phone — treat empty string as None
+    phone = request.phone.strip() if request.phone else None
+    if phone == '':
+        phone = None
+
+    # Check if phone already exists
+    if phone:
+        existing_phone = await db.execute(select(User).where(User.phone == phone))
+        if existing_phone.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Phone number {phone} is already registered to another user"
+            )
+
     # Create user with same store as the creator
-    user = User(
-        store_id=current_user.store_id,
-        email=f"{staff_id.lower()}@staff.kadaigpt.local",  # Placeholder email for staff
-        password_hash=get_password_hash(temp_password),
-        full_name=request.full_name,
-        role=valid_roles[request.role.lower()],
-        staff_id=staff_id,
-        phone=request.phone,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    try:
+        user = User(
+            store_id=current_user.store_id,
+            email=f"{staff_id.lower()}@staff.kadaigpt.local",  # Placeholder email for staff
+            password_hash=get_password_hash(temp_password),
+            full_name=request.full_name,
+            role=valid_roles[request.role.lower()],
+            staff_id=staff_id,
+            phone=phone,
+            is_active=True,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    except Exception as e:
+        await db.rollback()
+        error_msg = str(e).lower()
+        logger.error(f"[Staff] Creation failed: {e}")
+        if 'unique' in error_msg or 'duplicate' in error_msg:
+            if 'phone' in error_msg:
+                raise HTTPException(status_code=400, detail="This phone number is already registered")
+            elif 'email' in error_msg:
+                raise HTTPException(status_code=400, detail="Staff ID collision. Please try again.")
+            else:
+                raise HTTPException(status_code=400, detail=f"Duplicate entry error: {str(e)[:100]}")
+        raise HTTPException(status_code=500, detail=f"Failed to create staff: {str(e)[:150]}")
 
     logger.info(f"[Staff] Created {request.role} '{request.full_name}' with ID: {staff_id} by user {current_user.id}")
 
