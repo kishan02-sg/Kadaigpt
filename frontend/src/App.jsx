@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { ShoppingCart, Home, FileText, Package, BarChart3, Users, Settings as SettingsIcon, Plus, Command, LogOut, Menu, X, Bell, User, ChevronDown } from 'lucide-react'
+import { ShoppingCart, Home, FileText, Package, BarChart3, Users, Settings as SettingsIcon, Plus, Command, LogOut, Menu, X, Bell, User, ChevronDown, Star } from 'lucide-react'
 import MobileNav from './components/MobileNav'
 import OnboardingWizard from './components/OnboardingWizard'
 import CommandPalette from './components/CommandPalette'
@@ -308,7 +308,7 @@ function App() {
                 { id: 'bills', label: 'Bills', icon: FileText },
                 { id: 'products', label: 'Products', icon: Package },
                 { id: 'customers', label: 'Customers', icon: Users },
-                { id: 'settings', label: 'Settings', icon: SettingsIcon },
+                { id: 'loyalty', label: 'Loyalty', icon: Star },
             ]
         }
 
