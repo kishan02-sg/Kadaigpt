@@ -52,7 +52,7 @@ export default function Login({ onLogin }) {
             console.warn('Profile fetch failed, using fallback:', profileErr)
             user = { full_name: form.staffId, role: 'cashier', staff_id: form.staffId }
           }
-          localStorage.setItem('kadai_user_role', user.role || 'cashier')
+          localStorage.setItem('kadai_user_role', (user.role || 'cashier').toLowerCase())
           if (user.store?.name) localStorage.setItem('kadai_store_name', user.store.name)
           onLogin(user)
         } else {
@@ -66,7 +66,7 @@ export default function Login({ onLogin }) {
             console.warn('Profile fetch failed, using fallback:', profileErr)
             user = { email: form.email, role: 'owner', full_name: form.email }
           }
-          localStorage.setItem('kadai_user_role', user.role || 'owner')
+          localStorage.setItem('kadai_user_role', (user.role || 'owner').toLowerCase())
           if (user.store?.name) localStorage.setItem('kadai_store_name', user.store.name)
           onLogin(user)
         }

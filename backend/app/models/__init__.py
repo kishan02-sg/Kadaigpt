@@ -17,36 +17,36 @@ from datetime import datetime
 # ==================== ENUMS ====================
 
 class UserRole(str, enum.Enum):
-    OWNER = "owner"
-    MANAGER = "manager"
-    CASHIER = "cashier"
-    INVENTORY_MANAGER = "inventory_manager"
+    OWNER = "OWNER"
+    MANAGER = "MANAGER"
+    CASHIER = "CASHIER"
+    INVENTORY_MANAGER = "INVENTORY_MANAGER"
 
 
 class BillStatus(str, enum.Enum):
-    DRAFT = "draft"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-    REFUNDED = "refunded"
+    DRAFT = "DRAFT"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
 
 
 class PaymentMethod(str, enum.Enum):
-    CASH = "cash"
-    UPI = "upi"
-    CARD = "card"
-    CREDIT = "credit"
+    CASH = "CASH"
+    UPI = "UPI"
+    CARD = "CARD"
+    CREDIT = "CREDIT"
 
 
 class SyncStatus(str, enum.Enum):
-    PENDING = "pending"
-    SYNCED = "synced"
-    FAILED = "failed"
+    PENDING = "PENDING"
+    SYNCED = "SYNCED"
+    FAILED = "FAILED"
 
 
 class OCRConfidence(str, enum.Enum):
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
 
 
 # ==================== MODELS ====================
