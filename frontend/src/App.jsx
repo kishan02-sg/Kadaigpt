@@ -283,7 +283,7 @@ function App() {
         }
     }
 
-    // Role-based navigation items
+    // Role-based navigation — exactly 5 items per role, no more dropdown
     const getNavItems = () => {
         const role = (userRole || 'owner').toLowerCase()
 
@@ -292,6 +292,8 @@ function App() {
                 { id: 'products', label: 'Products', icon: Package },
                 { id: 'suppliers', label: 'Suppliers', icon: Users },
                 { id: 'bulk-operations', label: 'Import/Export', icon: FileText },
+                { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+                { id: 'settings', label: 'Settings', icon: SettingsIcon },
             ]
         }
 
@@ -301,6 +303,7 @@ function App() {
                 { id: 'bills', label: 'Bills', icon: FileText },
                 { id: 'products', label: 'Products', icon: Package },
                 { id: 'customers', label: 'Customers', icon: Users },
+                { id: 'settings', label: 'Settings', icon: SettingsIcon },
             ]
         }
 
@@ -310,67 +313,22 @@ function App() {
                 { id: 'create-bill', label: 'New Bill', icon: Plus, primary: true },
                 { id: 'products', label: 'Products', icon: Package },
                 { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+                { id: 'staff', label: 'Staff', icon: Users },
             ]
         }
 
-        // Owner — monitoring focused, no create-bill
+        // Owner — 5 items: monitoring + management
         return [
             { id: 'dashboard', label: 'Dashboard', icon: Home },
             { id: 'bills', label: 'Bills', icon: FileText },
             { id: 'products', label: 'Products', icon: Package },
-            { id: 'customers', label: 'Customers', icon: Users },
             { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+            { id: 'staff', label: 'Staff', icon: Users },
         ]
     }
 
     const getMoreItems = () => {
-        const role = (userRole || 'owner').toLowerCase()
-
-        if (role === 'inventory_manager') {
-            return [
-                { id: 'settings', label: 'Settings' },
-            ]
-        }
-
-        if (role === 'cashier') {
-            return [
-                { id: 'ocr', label: 'Scan Bill (OCR)' },
-                { id: 'settings', label: 'Settings' },
-            ]
-        }
-
-        if (role === 'manager') {
-            return [
-                { id: 'bills', label: 'Bills' },
-                { id: 'customers', label: 'Customers' },
-                { id: 'suppliers', label: 'Suppliers' },
-                { id: 'staff', label: 'Staff Management' },
-                { id: 'gst', label: 'GST Reports' },
-                { id: 'expenses', label: 'Expenses' },
-                { id: 'daily-summary', label: 'Daily Report' },
-                { id: 'ocr', label: 'Scan Bill (OCR)' },
-                { id: 'bulk-operations', label: 'Import/Export' },
-                { id: 'ai-insights', label: 'AI Insights' },
-                { id: 'whatsapp', label: 'WhatsApp' },
-                { id: 'loyalty', label: 'Loyalty' },
-                { id: 'settings', label: 'Settings' },
-            ]
-        }
-
-        // Owner
-        return [
-            { id: 'suppliers', label: 'Suppliers' },
-            { id: 'gst', label: 'GST Reports' },
-            { id: 'daily-summary', label: 'Daily Report' },
-            { id: 'staff', label: 'Staff Management' },
-            { id: 'stores', label: 'My Stores' },
-            { id: 'ai-insights', label: 'AI Insights' },
-            { id: 'expenses', label: 'Expenses' },
-            { id: 'whatsapp', label: 'WhatsApp' },
-            { id: 'loyalty', label: 'Loyalty' },
-            { id: 'subscription', label: 'Subscription' },
-            { id: 'settings', label: 'Settings' },
-        ]
+        return [] // No more dropdown — all nav in one line
     }
 
     const navItems = getNavItems()
