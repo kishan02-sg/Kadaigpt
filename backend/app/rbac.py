@@ -4,7 +4,7 @@ Permission checks for API endpoints
 """
 
 from fastapi import HTTPException, status, Depends
-from app.config.roles import UserRole, ROLE_LEVELS
+from app.constants.roles import UserRole, ROLE_LEVELS
 from app.models import User
 from app.routers.auth import get_current_active_user
 

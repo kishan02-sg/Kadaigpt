@@ -14,7 +14,7 @@ import enum
 from datetime import datetime
 
 # Import enums from single source of truth
-from app.config.roles import UserRole, BillStatus, PaymentMethod, SyncStatus, OCRConfidence
+from app.constants.roles import UserRole, BillStatus, PaymentMethod, SyncStatus, OCRConfidence
 
 
 # ==================== MODELS ====================

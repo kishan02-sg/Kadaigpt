@@ -8,7 +8,7 @@ from typing import Optional, List
 from datetime import datetime
 
 # Import enums from single source of truth (same enums used by models)
-from app.config.roles import (
+from app.constants.roles import (
     UserRole as UserRoleEnum,
     PaymentMethod as PaymentMethodEnum,
     BillStatus as BillStatusEnum,

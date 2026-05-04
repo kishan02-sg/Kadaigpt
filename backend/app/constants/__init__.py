@@ -1,5 +1,5 @@
 # Re-export everything from roles.py for clean imports
-from app.config.roles import (
+from app.constants.roles import (
     UserRole,
     PaymentMethod,
     BillStatus,
