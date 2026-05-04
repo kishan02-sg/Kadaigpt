@@ -277,7 +277,7 @@ function App() {
     // Navigation — driven by config/roles.js (clean, no if-else chains)
     const roleConfig = getRoleConfig(userRole)
     const navItems = roleConfig.nav
-    const moreItems = [] // No dropdown — all 5 items in one row
+    const moreItems = roleConfig.moreNav || [] // Owner has More dropdown, staff don't
 
     if (loading) {
         return <LoadingScreen status={warmupStatus.status} message={warmupStatus.message} />
@@ -345,7 +345,8 @@ function App() {
                             </button>
                         ))}
 
-                        {/* More Dropdown */}
+                        {/* More Dropdown — Owner only */}
+                        {moreItems.length > 0 && (
                         <div className="nav-dropdown">
                             <button className="nav-link">
                                 More <ChevronDown size={14} />
@@ -357,11 +358,13 @@ function App() {
                                         className="dropdown-item"
                                         onClick={() => setCurrentPage(item.id)}
                                     >
+                                        <item.icon size={16} />
                                         {item.label}
                                     </button>
                                 ))}
                             </div>
                         </div>
+                        )}
                     </nav>
                 </div>
 

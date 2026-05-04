@@ -2,32 +2,45 @@
  * KadaiGPT — Role Configuration
  * Single source of truth for owner vs staff navigation & permissions.
  *
- * To add a new role:  add a key here, the app picks it up automatically.
- * To change nav order: reorder items in the `nav` array below.
+ * Owner: full nav + "More" dropdown for all extra pages
+ * Staff:  exactly 5 nav items, no dropdown
  */
 
 import {
     Home, FileText, Package, BarChart3, Users, Plus, Star,
-    Settings as SettingsIcon,
+    Settings as SettingsIcon, Receipt, TrendingUp, Truck,
+    Gift, Brain, Wallet, CalendarCheck, Upload,
 } from 'lucide-react'
 
 // ─────────────────────────────────────────────────────
-//  OWNER  — monitors everything, manages staff
+//  OWNER  — full access to everything + More dropdown
 // ─────────────────────────────────────────────────────
 const OWNER = {
     label: 'Owner',
     defaultPage: 'dashboard',
     nav: [
-        { id: 'dashboard', label: 'Dashboard', icon: Home },
-        { id: 'bills',     label: 'Bills',     icon: FileText },
-        { id: 'products',  label: 'Products',  icon: Package },
-        { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-        { id: 'staff',     label: 'Staff',     icon: Users },
+        { id: 'dashboard',   label: 'Dashboard', icon: Home },
+        { id: 'create-bill', label: 'New Bill',  icon: Plus, primary: true },
+        { id: 'bills',       label: 'Bills',     icon: FileText },
+        { id: 'products',    label: 'Products',  icon: Package },
+        { id: 'analytics',   label: 'Analytics', icon: BarChart3 },
+    ],
+    moreNav: [
+        { id: 'customers',       label: 'Customers',     icon: Users },
+        { id: 'staff',           label: 'Staff',          icon: Users },
+        { id: 'loyalty',         label: 'Loyalty',        icon: Gift },
+        { id: 'suppliers',       label: 'Suppliers',      icon: Truck },
+        { id: 'expenses',        label: 'Expenses',       icon: Wallet },
+        { id: 'daily-summary',   label: 'Daily Summary',  icon: CalendarCheck },
+        { id: 'ai-insights',     label: 'AI Insights',    icon: Brain },
+        { id: 'gst',             label: 'GST Reports',    icon: Receipt },
+        { id: 'bulk-operations', label: 'Import/Export',   icon: Upload },
+        { id: 'settings',        label: 'Settings',       icon: SettingsIcon },
     ],
 }
 
 // ─────────────────────────────────────────────────────
-//  MANAGER  — bills + analytics + staff management
+//  MANAGER  — bills + analytics + staff (no More)
 // ─────────────────────────────────────────────────────
 const MANAGER = {
     label: 'Manager',
@@ -39,10 +52,11 @@ const MANAGER = {
         { id: 'analytics',   label: 'Analytics', icon: BarChart3 },
         { id: 'staff',       label: 'Staff',     icon: Users },
     ],
+    moreNav: [],
 }
 
 // ─────────────────────────────────────────────────────
-//  CASHIER  — billing + customers + loyalty
+//  CASHIER  — billing + customers + loyalty (no More)
 // ─────────────────────────────────────────────────────
 const CASHIER = {
     label: 'Cashier',
@@ -54,10 +68,11 @@ const CASHIER = {
         { id: 'customers',   label: 'Customers',  icon: Users },
         { id: 'loyalty',     label: 'Loyalty',    icon: Star },
     ],
+    moreNav: [],
 }
 
 // ─────────────────────────────────────────────────────
-//  INVENTORY MANAGER  — stock, suppliers, bulk ops
+//  INVENTORY MANAGER  — stock, suppliers, bulk (no More)
 // ─────────────────────────────────────────────────────
 const INVENTORY_MANAGER = {
     label: 'Inventory',
@@ -69,6 +84,7 @@ const INVENTORY_MANAGER = {
         { id: 'analytics',       label: 'Analytics',    icon: BarChart3 },
         { id: 'settings',        label: 'Settings',     icon: SettingsIcon },
     ],
+    moreNav: [],
 }
 
 // ─────────────────────────────────────────────────────
