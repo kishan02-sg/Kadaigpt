@@ -141,8 +141,13 @@ function App() {
                 try {
                     const userData = await api.getProfile()
                     setUser(userData)
+                    setUserRole((userData.role || 'cashier').toLowerCase())
                 } catch {
-                    api.logout()
+                    // Don't logout! Use cached role/user from localStorage
+                    console.warn('[App] getProfile failed on refresh, keeping session with cached data')
+                    const cachedRole = localStorage.getItem('kadai_user_role') || 'cashier'
+                    setUser({ role: cachedRole, full_name: 'User' })
+                    setUserRole(cachedRole)
                 }
             }
         }

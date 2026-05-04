@@ -138,10 +138,11 @@ export function AuthProvider({ children }) {
                         }
                     }
                 } catch (err) {
-                    console.error('Auth check failed:', err)
-                    api.logout()
-                    setUser(null)
-                    setIsAuthenticated(false)
+                    // Don't logout! Use cached data from localStorage
+                    console.warn('Auth profile check failed, using cached data:', err)
+                    const cachedRole = localStorage.getItem('kadai_user_role') || 'cashier'
+                    setUser({ role: cachedRole, full_name: 'User' })
+                    setIsAuthenticated(true)
                 }
             }
             setLoading(false)
