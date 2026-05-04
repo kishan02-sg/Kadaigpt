@@ -51,20 +51,60 @@ import './styles/ux-rules.css'
 // Initialize error tracking on app load
 errorTracker.init()
 
+// ═══════════════════════════════════════════════════════════════
+// ROLE CONFIG — Single source of truth for owner vs staff roles
+// Each role: defaultPage, label, nav (exactly 5 items)
+// ═══════════════════════════════════════════════════════════════
+const ROLE_CONFIG = {
+    owner: {
+        label: 'Owner',
+        defaultPage: 'dashboard',
+        nav: [
+            { id: 'dashboard', label: 'Dashboard', icon: Home },
+            { id: 'bills',     label: 'Bills',     icon: FileText },
+            { id: 'products',  label: 'Products',  icon: Package },
+            { id: 'analytics', label: 'Analytics',  icon: BarChart3 },
+            { id: 'staff',     label: 'Staff',     icon: Users },
+        ],
+    },
+    manager: {
+        label: 'Manager',
+        defaultPage: 'dashboard',
+        nav: [
+            { id: 'dashboard',   label: 'Dashboard', icon: Home },
+            { id: 'create-bill', label: 'New Bill',  icon: Plus, primary: true },
+            { id: 'products',    label: 'Products',  icon: Package },
+            { id: 'analytics',   label: 'Analytics', icon: BarChart3 },
+            { id: 'staff',       label: 'Staff',     icon: Users },
+        ],
+    },
+    cashier: {
+        label: 'Cashier',
+        defaultPage: 'create-bill',
+        nav: [
+            { id: 'create-bill', label: 'New Bill',   icon: Plus, primary: true },
+            { id: 'bills',       label: 'Bills',      icon: FileText },
+            { id: 'products',    label: 'Products',   icon: Package },
+            { id: 'customers',   label: 'Customers',  icon: Users },
+            { id: 'loyalty',     label: 'Loyalty',    icon: Star },
+        ],
+    },
+    inventory_manager: {
+        label: 'Inventory',
+        defaultPage: 'products',
+        nav: [
+            { id: 'products',        label: 'Products',     icon: Package },
+            { id: 'suppliers',       label: 'Suppliers',    icon: Users },
+            { id: 'bulk-operations', label: 'Import/Export', icon: FileText },
+            { id: 'analytics',       label: 'Analytics',    icon: BarChart3 },
+            { id: 'settings',        label: 'Settings',     icon: SettingsIcon },
+        ],
+    },
+}
+
 function App() {
-    // Role-specific default pages (mental model alignment)
-    // Cashier: goes straight to billing (their only job)
-    // Accountant: goes to GST reports (their primary task)
-    // Warehouse: goes to inventory (stock in/out)
-    // Owner/Manager: dashboard overview
     const getRoleDefaultPage = (role) => {
-        const defaults = {
-            cashier: 'create-bill',
-            inventory_manager: 'products',
-            manager: 'dashboard',
-            owner: 'dashboard',
-        }
-        return defaults[(role || 'owner').toLowerCase()] || 'dashboard'
+        return ROLE_CONFIG[(role || 'owner').toLowerCase()]?.defaultPage || 'dashboard'
     }
 
     const getInitialPage = () => {
@@ -288,56 +328,11 @@ function App() {
         }
     }
 
-    // Role-based navigation — exactly 5 items per role, no more dropdown
-    const getNavItems = () => {
-        const role = (userRole || 'owner').toLowerCase()
-
-        if (role === 'inventory_manager') {
-            return [
-                { id: 'products', label: 'Products', icon: Package },
-                { id: 'suppliers', label: 'Suppliers', icon: Users },
-                { id: 'bulk-operations', label: 'Import/Export', icon: FileText },
-                { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-                { id: 'settings', label: 'Settings', icon: SettingsIcon },
-            ]
-        }
-
-        if (role === 'cashier') {
-            return [
-                { id: 'create-bill', label: 'New Bill', icon: Plus, primary: true },
-                { id: 'bills', label: 'Bills', icon: FileText },
-                { id: 'products', label: 'Products', icon: Package },
-                { id: 'customers', label: 'Customers', icon: Users },
-                { id: 'loyalty', label: 'Loyalty', icon: Star },
-            ]
-        }
-
-        if (role === 'manager') {
-            return [
-                { id: 'dashboard', label: 'Dashboard', icon: Home },
-                { id: 'create-bill', label: 'New Bill', icon: Plus, primary: true },
-                { id: 'products', label: 'Products', icon: Package },
-                { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-                { id: 'staff', label: 'Staff', icon: Users },
-            ]
-        }
-
-        // Owner — 5 items: monitoring + management
-        return [
-            { id: 'dashboard', label: 'Dashboard', icon: Home },
-            { id: 'bills', label: 'Bills', icon: FileText },
-            { id: 'products', label: 'Products', icon: Package },
-            { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-            { id: 'staff', label: 'Staff', icon: Users },
-        ]
-    }
-
-    const getMoreItems = () => {
-        return [] // No more dropdown — all nav in one line
-    }
-
-    const navItems = getNavItems()
-    const moreItems = getMoreItems()
+    // Navigation — driven by ROLE_CONFIG (clean, no if-else chains)
+    const roleKey = (userRole || 'owner').toLowerCase()
+    const roleConfig = ROLE_CONFIG[roleKey] || ROLE_CONFIG.owner
+    const navItems = roleConfig.nav
+    const moreItems = [] // No dropdown — all 5 items in one row
 
     if (loading) {
         return <LoadingScreen status={warmupStatus.status} message={warmupStatus.message} />
