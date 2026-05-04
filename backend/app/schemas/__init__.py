@@ -12,24 +12,46 @@ from enum import Enum
 # ==================== ENUMS ====================
 
 class UserRoleEnum(str, Enum):
-    OWNER = "owner"
-    MANAGER = "manager"
-    CASHIER = "cashier"
-    INVENTORY_MANAGER = "inventory_manager"
+    OWNER = "OWNER"
+    MANAGER = "MANAGER"
+    CASHIER = "CASHIER"
+    INVENTORY_MANAGER = "INVENTORY_MANAGER"
+
+    @classmethod
+    def _missing_(cls, value):
+        # Accept case-insensitive input (e.g., "cash" -> "CASH")
+        for member in cls:
+            if member.value.upper() == value.upper():
+                return member
+        return None
 
 
 class PaymentMethodEnum(str, Enum):
-    CASH = "cash"
-    UPI = "upi"
-    CARD = "card"
-    CREDIT = "credit"
+    CASH = "CASH"
+    UPI = "UPI"
+    CARD = "CARD"
+    CREDIT = "CREDIT"
+
+    @classmethod
+    def _missing_(cls, value):
+        for member in cls:
+            if member.value.upper() == value.upper():
+                return member
+        return None
 
 
 class BillStatusEnum(str, Enum):
-    DRAFT = "draft"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
-    REFUNDED = "refunded"
+    DRAFT = "DRAFT"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
+
+    @classmethod
+    def _missing_(cls, value):
+        for member in cls:
+            if member.value.upper() == value.upper():
+                return member
+        return None
 
 
 # ==================== AUTH SCHEMAS ====================
