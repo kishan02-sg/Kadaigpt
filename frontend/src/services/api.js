@@ -299,10 +299,10 @@ class ApiService {
     }
 
     // Create a new staff member (Owner/Manager only)
-    async createStaff(fullName, role, phone = null) {
+    async createStaff(staffData) {
         return this.request('/auth/create-staff', {
             method: 'POST',
-            body: JSON.stringify({ full_name: fullName, role, phone }),
+            body: JSON.stringify(staffData),
         })
     }
 
@@ -320,9 +320,35 @@ class ApiService {
 
     // Change password
     async changePassword(currentPassword, newPassword) {
-        return this.request(`/auth/change-password?current_password=${encodeURIComponent(currentPassword)}&new_password=${encodeURIComponent(newPassword)}`, {
+        return this.request('/auth/change-password', {
             method: 'PUT',
+            body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
         })
+    }
+
+    // OTP-based forgot password
+    async forgotPasswordPhone(phone) {
+        const response = await fetch(`${this.baseUrl}/auth/forgot-password-phone`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone }),
+        })
+        let data
+        try { data = await response.json() } catch { throw new Error('Server error. Try again.') }
+        if (!response.ok) throw new Error(data.detail || 'Failed to send OTP')
+        return data
+    }
+
+    async verifyOTPReset(phone, otp, newPassword) {
+        const response = await fetch(`${this.baseUrl}/auth/verify-otp-reset`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone, otp, new_password: newPassword }),
+        })
+        let data
+        try { data = await response.json() } catch { throw new Error('Server error. Try again.') }
+        if (!response.ok) throw new Error(data.detail || 'OTP verification failed')
+        return data
     }
 
     // Dashboard endpoints

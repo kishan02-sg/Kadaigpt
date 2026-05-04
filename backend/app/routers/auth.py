@@ -549,31 +549,156 @@ async def create_staff(
     }
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6)
+
+
 @router.put("/change-password")
 async def change_password(
-    current_password: str = "",
-    new_password: str = "",
+    request: ChangePasswordRequest,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Change password for the current user"""
-    # For staff first login, current_password may be the temp password
-    if not verify_password(current_password, current_user.password_hash):
+    if not verify_password(request.current_password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
 
-    if len(new_password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password must be at least 6 characters"
-        )
-
-    current_user.password_hash = get_password_hash(new_password)
+    current_user.password_hash = get_password_hash(request.new_password)
+    # Clear the must_change_password flag if set
+    if hasattr(current_user, 'must_change_password'):
+        current_user.must_change_password = False
     await db.commit()
 
     return {"message": "Password changed successfully", "success": True}
+
+
+# ═══════════════════════════════════════════
+# OTP-BASED FORGOT PASSWORD (Phone-based)
+# ═══════════════════════════════════════════
+
+# In-memory OTP store (for serverless — in production use Redis/DB)
+_otp_store: Dict[str, dict] = {}
+
+
+class ForgotPasswordPhoneRequest(BaseModel):
+    phone: str = Field(..., min_length=10)
+
+
+class VerifyOTPRequest(BaseModel):
+    phone: str = Field(..., min_length=10)
+    otp: str = Field(..., min_length=4, max_length=6)
+    new_password: str = Field(..., min_length=6)
+
+
+@router.post("/forgot-password-phone")
+async def forgot_password_phone(
+    request: ForgotPasswordPhoneRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Send OTP to phone for password reset.
+    For now, returns OTP in response (in production, integrate SMS gateway like Twilio/MSG91).
+    """
+    phone = request.phone.strip().replace(" ", "")
+    # Support with or without country code
+    phone_variants = [phone, f"+91{phone}", phone[-10:] if len(phone) > 10 else phone]
+
+    user = None
+    for pv in phone_variants:
+        result = await db.execute(select(User).where(User.phone == pv))
+        user = result.scalar_one_or_none()
+        if user:
+            break
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No account found with this phone number"
+        )
+
+    # Generate 4-digit OTP
+    import random
+    otp = str(random.randint(1000, 9999))
+
+    # Store OTP with expiry (5 minutes)
+    _otp_store[phone[-10:]] = {
+        "otp": otp,
+        "user_id": user.id,
+        "expires": datetime.utcnow() + timedelta(minutes=5),
+        "attempts": 0
+    }
+
+    logger.info(f"[OTP] Generated OTP for phone {phone[-4:]}: {otp}")
+
+    # In production, send via SMS gateway (MSG91, Twilio, etc.)
+    # For now, return OTP in response for testing
+    return {
+        "message": "OTP sent to your phone number",
+        "otp_preview": otp,  # REMOVE IN PRODUCTION — only for testing
+        "expires_in": "5 minutes",
+        "phone_last4": phone[-4:]
+    }
+
+
+@router.post("/verify-otp-reset")
+async def verify_otp_reset(
+    request: VerifyOTPRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Verify OTP and reset password"""
+    phone_key = request.phone[-10:]
+
+    if phone_key not in _otp_store:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No OTP was requested for this number. Please request a new OTP."
+        )
+
+    stored = _otp_store[phone_key]
+
+    # Check expiry
+    if datetime.utcnow() > stored["expires"]:
+        del _otp_store[phone_key]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP has expired. Please request a new one."
+        )
+
+    # Check attempts
+    stored["attempts"] += 1
+    if stored["attempts"] > 5:
+        del _otp_store[phone_key]
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Please request a new OTP."
+        )
+
+    # Verify OTP
+    if stored["otp"] != request.otp.strip():
+        remaining = 5 - stored["attempts"]
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid OTP. {remaining} attempt(s) remaining."
+        )
+
+    # OTP correct — update password
+    result = await db.execute(select(User).where(User.id == stored["user_id"]))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.password_hash = get_password_hash(request.new_password)
+    await db.commit()
+
+    # Clean up OTP
+    del _otp_store[phone_key]
+
+    return {"message": "Password reset successfully. You can now login with your new password.", "success": True}
 
 
 @router.get("/staff/list", response_model=list)

@@ -16,15 +16,16 @@ export default function Login({ onLogin }) {
     storeName: '',
     staffId: '', // For staff login
   })
-  // Forgot password state
+  // Forgot password state (OTP-based)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const [forgotEmail, setForgotEmail] = useState('')
-  const [resetToken, setResetToken] = useState('')
+  const [forgotPhone, setForgotPhone] = useState('')
+  const [otpCode, setOtpCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [forgotStep, setForgotStep] = useState(1) // 1=email, 2=token+password
+  const [forgotStep, setForgotStep] = useState(1) // 1=phone, 2=otp+password
   const [forgotLoading, setForgotLoading] = useState(false)
   const [forgotMessage, setForgotMessage] = useState('')
   const [forgotError, setForgotError] = useState('')
+  const [otpPreview, setOtpPreview] = useState('') // For testing only
 
   // Clear error when switching between login/register
   const toggleMode = () => {
@@ -338,7 +339,7 @@ export default function Login({ onLogin }) {
                     <input type="checkbox" id="rememberme" name="rememberme" />
                     <span>Remember me</span>
                   </label>
-                  <button type="button" className="forgot-link" onClick={() => { setShowForgotPassword(true); setForgotStep(1); setForgotEmail(form.email || ''); setForgotMessage(''); setForgotError('') }}>
+                  <button type="button" className="forgot-link" onClick={() => { setShowForgotPassword(true); setForgotStep(1); setForgotPhone(''); setForgotMessage(''); setForgotError(''); setOtpCode(''); setNewPassword(''); setOtpPreview('') }}>
                     Forgot password?
                   </button>
                 </div>
@@ -376,7 +377,7 @@ export default function Login({ onLogin }) {
         </div>
       </div>
 
-      {/* Forgot Password Modal */}
+      {/* Forgot Password Modal — OTP-based */}
       {showForgotPassword && (
         <div className="modal-overlay" onClick={() => setShowForgotPassword(false)} style={{ zIndex: 10000 }}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px', margin: '20px' }}>
@@ -393,50 +394,59 @@ export default function Login({ onLogin }) {
               {forgotStep === 1 ? (
                 <>
                   <p style={{ marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    Enter your registered email address. We'll send you a password reset token.
+                    Enter your registered phone number. We'll send an OTP to verify your identity.
                   </p>
                   <div className="form-group">
-                    <label className="form-label">Email Address</label>
+                    <label className="form-label">Phone Number</label>
                     <input
-                      type="email"
+                      type="tel"
                       className="form-input"
-                      value={forgotEmail}
-                      onChange={e => setForgotEmail(e.target.value)}
-                      placeholder="your@email.com"
+                      value={forgotPhone}
+                      onChange={e => setForgotPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="Enter 10-digit phone number"
+                      maxLength={10}
                       autoFocus
                     />
                   </div>
                   <button
                     className="btn btn-primary w-full"
-                    disabled={forgotLoading || !forgotEmail.includes('@')}
+                    disabled={forgotLoading || forgotPhone.length < 10}
                     onClick={async () => {
                       setForgotLoading(true); setForgotError('');
                       try {
-                        await api.forgotPassword(forgotEmail);
-                        setForgotMessage('Reset token generated! Check server logs for the token (email coming soon).');
+                        const result = await api.forgotPasswordPhone(forgotPhone);
+                        setOtpPreview(result.otp_preview || '');
+                        setForgotMessage(`OTP sent to ******${forgotPhone.slice(-4)}`);
                         setForgotStep(2);
                       } catch (err) {
-                        setForgotError(err.message || 'Failed to send reset request');
+                        setForgotError(err.message || 'Failed to send OTP');
                       } finally { setForgotLoading(false) }
                     }}
                   >
-                    {forgotLoading ? 'Sending...' : 'Send Reset Token'}
+                    {forgotLoading ? 'Sending...' : 'Send OTP'}
                   </button>
                 </>
               ) : (
                 <>
                   <p style={{ marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    Enter the reset token and your new password.
+                    Enter the OTP sent to your phone and set a new password.
                   </p>
+                  {otpPreview && (
+                    <div style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem', textAlign: 'center' }}>
+                      🧪 Test OTP: <strong style={{ fontSize: '1.2rem', letterSpacing: '3px' }}>{otpPreview}</strong>
+                    </div>
+                  )}
                   <div className="form-group">
-                    <label className="form-label">Reset Token</label>
+                    <label className="form-label">OTP Code</label>
                     <input
                       type="text"
                       className="form-input"
-                      value={resetToken}
-                      onChange={e => setResetToken(e.target.value)}
-                      placeholder="Paste token here"
+                      value={otpCode}
+                      onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="Enter 4-digit OTP"
+                      maxLength={6}
                       autoFocus
+                      style={{ fontSize: '1.5rem', letterSpacing: '8px', textAlign: 'center', fontWeight: 700 }}
                     />
                   </div>
                   <div className="form-group">
@@ -452,19 +462,26 @@ export default function Login({ onLogin }) {
                   </div>
                   <button
                     className="btn btn-primary w-full"
-                    disabled={forgotLoading || !resetToken || newPassword.length < 6}
+                    disabled={forgotLoading || otpCode.length < 4 || newPassword.length < 6}
                     onClick={async () => {
                       setForgotLoading(true); setForgotError('');
                       try {
-                        await api.resetPassword(resetToken, newPassword);
+                        await api.verifyOTPReset(forgotPhone, otpCode, newPassword);
                         setForgotMessage('Password reset successfully! You can now login.');
-                        setTimeout(() => { setShowForgotPassword(false); setForgotStep(1); setResetToken(''); setNewPassword('') }, 2000);
+                        setTimeout(() => { setShowForgotPassword(false); setForgotStep(1); setOtpCode(''); setNewPassword('') }, 2000);
                       } catch (err) {
                         setForgotError(err.message || 'Failed to reset password');
                       } finally { setForgotLoading(false) }
                     }}
                   >
                     {forgotLoading ? 'Resetting...' : 'Reset Password'}
+                  </button>
+                  <button
+                    type="button"
+                    style={{ marginTop: '12px', background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.85rem', width: '100%', textAlign: 'center' }}
+                    onClick={() => { setForgotStep(1); setForgotError(''); setForgotMessage(''); setOtpPreview('') }}
+                  >
+                    ← Change phone number
                   </button>
                 </>
               )}

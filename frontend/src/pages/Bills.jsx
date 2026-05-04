@@ -240,9 +240,11 @@ export default function Bills({ addToast, setCurrentPage }) {
                     <h1 className="page-title">📄 All Bills</h1>
                     <p className="page-subtitle">View, search, and export your billing history</p>
                 </div>
+                {localStorage.getItem('kadai_user_role')?.toLowerCase() !== 'owner' && (
                 <button className="btn btn-primary" onClick={() => setCurrentPage('create-bill')}>
                     + New Bill
                 </button>
+                )}
             </div>
 
             {/* Stats Bar */}
