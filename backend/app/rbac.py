@@ -4,16 +4,9 @@ Permission checks for API endpoints
 """
 
 from fastapi import HTTPException, status, Depends
-from app.models import User, UserRole
+from app.config.roles import UserRole, ROLE_LEVELS
+from app.models import User
 from app.routers.auth import get_current_active_user
-
-
-# Permission levels (higher = more access)
-ROLE_LEVELS = {
-    UserRole.CASHIER: 1,
-    UserRole.MANAGER: 2,
-    UserRole.OWNER: 3,
-}
 
 
 def require_role(*allowed_roles: UserRole):

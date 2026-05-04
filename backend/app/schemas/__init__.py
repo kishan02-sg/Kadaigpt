@@ -6,52 +6,13 @@ Request/Response schemas for API endpoints
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List
 from datetime import datetime
-from enum import Enum
 
-
-# ==================== ENUMS ====================
-
-class UserRoleEnum(str, Enum):
-    OWNER = "OWNER"
-    MANAGER = "MANAGER"
-    CASHIER = "CASHIER"
-    INVENTORY_MANAGER = "INVENTORY_MANAGER"
-
-    @classmethod
-    def _missing_(cls, value):
-        # Accept case-insensitive input (e.g., "cash" -> "CASH")
-        for member in cls:
-            if member.value.upper() == value.upper():
-                return member
-        return None
-
-
-class PaymentMethodEnum(str, Enum):
-    CASH = "CASH"
-    UPI = "UPI"
-    CARD = "CARD"
-    CREDIT = "CREDIT"
-
-    @classmethod
-    def _missing_(cls, value):
-        for member in cls:
-            if member.value.upper() == value.upper():
-                return member
-        return None
-
-
-class BillStatusEnum(str, Enum):
-    DRAFT = "DRAFT"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
-    REFUNDED = "REFUNDED"
-
-    @classmethod
-    def _missing_(cls, value):
-        for member in cls:
-            if member.value.upper() == value.upper():
-                return member
-        return None
+# Import enums from single source of truth (same enums used by models)
+from app.config.roles import (
+    UserRole as UserRoleEnum,
+    PaymentMethod as PaymentMethodEnum,
+    BillStatus as BillStatusEnum,
+)
 
 
 # ==================== AUTH SCHEMAS ====================

@@ -13,40 +13,8 @@ from app.database import Base
 import enum
 from datetime import datetime
 
-
-# ==================== ENUMS ====================
-
-class UserRole(str, enum.Enum):
-    OWNER = "OWNER"
-    MANAGER = "MANAGER"
-    CASHIER = "CASHIER"
-    INVENTORY_MANAGER = "INVENTORY_MANAGER"
-
-
-class BillStatus(str, enum.Enum):
-    DRAFT = "DRAFT"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
-    REFUNDED = "REFUNDED"
-
-
-class PaymentMethod(str, enum.Enum):
-    CASH = "CASH"
-    UPI = "UPI"
-    CARD = "CARD"
-    CREDIT = "CREDIT"
-
-
-class SyncStatus(str, enum.Enum):
-    PENDING = "PENDING"
-    SYNCED = "SYNCED"
-    FAILED = "FAILED"
-
-
-class OCRConfidence(str, enum.Enum):
-    HIGH = "HIGH"
-    MEDIUM = "MEDIUM"
-    LOW = "LOW"
+# Import enums from single source of truth
+from app.config.roles import UserRole, BillStatus, PaymentMethod, SyncStatus, OCRConfidence
 
 
 # ==================== MODELS ====================
