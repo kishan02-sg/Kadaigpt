@@ -8,6 +8,10 @@
         {
             "source": "/api/:path(.*)",
             "destination": "/api/index.py"
+        },
+        {
+            "source": "/((?!api|assets|favicon).*)",
+            "destination": "/index.html"
         }
     ],
     "functions": {
