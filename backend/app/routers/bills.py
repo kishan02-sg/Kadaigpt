@@ -325,8 +325,10 @@ async def create_bill(
         try:
             cust_result = await db.execute(
                 select(Customer).where(
-                    Customer.store_id == current_user.store_id,
-                    Customer.phone == bill_data.customer_phone
+                    and_(
+                        Customer.store_id == current_user.store_id,
+                        Customer.phone == bill_data.customer_phone
+                    )
                 )
             )
             customer = cust_result.scalar_one_or_none()
@@ -338,9 +340,14 @@ async def create_bill(
                 customer.loyalty_points = (customer.loyalty_points or 0) + points_earned
                 customer.total_purchases = (customer.total_purchases or 0) + totals["total_amount"]
                 customer.last_purchase = datetime.utcnow()
+                await db.commit()
+                import logging
+                logging.getLogger(__name__).info(
+                    f"Loyalty: +{points_earned}pts to {customer.name} (phone={bill_data.customer_phone})"
+                )
             else:
                 # New customer — auto-create from bill
-                customer = Customer(
+                new_customer = Customer(
                     store_id=current_user.store_id,
                     name=bill_data.customer_name or "Walk-in",
                     phone=bill_data.customer_phone,
@@ -349,12 +356,20 @@ async def create_bill(
                     last_purchase=datetime.utcnow(),
                     credit=0.0,
                 )
-                db.add(customer)
-            
-            await db.commit()
+                db.add(new_customer)
+                await db.commit()
+                import logging
+                logging.getLogger(__name__).info(
+                    f"Loyalty: Created customer '{new_customer.name}' phone={bill_data.customer_phone} +{points_earned}pts"
+                )
         except Exception as e:
             import logging
-            logging.getLogger(__name__).warning(f"Loyalty points update failed: {e}")
+            logging.getLogger(__name__).error(f"Loyalty points update FAILED: {type(e).__name__}: {e}")
+            # Don't let loyalty failure break the bill
+            try:
+                await db.rollback()
+            except Exception:
+                pass
     
     # Get items for response
     items_result = await db.execute(
