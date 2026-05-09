@@ -154,68 +154,75 @@ app.add_middleware(
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Security Middleware — Rate Limiting + Headers + Request Timing
+# Security Middleware — Pure ASGI (no BaseHTTPMiddleware)
+# BaseHTTPMiddleware / @app.middleware("http") run handlers in a threadpool,
+# which breaks SQLAlchemy async greenlet context → MissingGreenlet error.
+# Using raw ASGI middleware preserves the greenlet.
 # ═══════════════════════════════════════════════════════════════════
-@app.middleware("http")
-async def security_middleware(request: Request, call_next):
-    """Adds rate limiting, security headers, request IDs, and timing."""
-    start_time = time.time()
-    request_id = str(uuid.uuid4())[:8]
-    
-    # Rate limiting (skip for health/ping/docs endpoints)
-    client_ip = request.client.host if request.client else "unknown"
-    path = request.url.path
-    
-    if not path.startswith(("/api/ping", "/api/health", "/api/docs", "/api/redoc", "/api/openapi")):
-        limit_type = get_rate_limit_type(path)
-        limits = RATE_LIMITS.get(limit_type, RATE_LIMITS['api'])
-        allowed, remaining = rate_limiter.check_rate_limit(
-            f"{client_ip}:{limit_type}",
-            max_requests=limits['max'],
-            window_seconds=limits['window']
-        )
-        if not allowed:
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "error": True,
-                    "message": "Too many requests. Please slow down.",
-                    "retry_after": limits['window']
-                },
-                headers={"Retry-After": str(limits['window'])}
+from starlette.types import ASGIApp, Scope, Receive, Send
+from starlette.responses import Response as StarletteResponse
+
+class SecurityASGIMiddleware:
+    """Pure ASGI middleware for rate limiting + security headers.
+    Does NOT use BaseHTTPMiddleware, so it preserves SQLAlchemy async greenlet context.
+    """
+    def __init__(self, app: ASGIApp):
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        start_time = time.time()
+        request_id = str(uuid.uuid4())[:8]
+        path = scope.get("path", "")
+        
+        # Rate limiting (skip health/docs)
+        if not path.startswith(("/api/ping", "/api/health", "/api/docs", "/api/redoc", "/api/openapi")):
+            # Get client IP from scope
+            client_addr = scope.get("client")
+            client_ip = client_addr[0] if client_addr else "unknown"
+            
+            limit_type = get_rate_limit_type(path)
+            limits = RATE_LIMITS.get(limit_type, RATE_LIMITS['api'])
+            allowed, remaining = rate_limiter.check_rate_limit(
+                f"{client_ip}:{limit_type}",
+                max_requests=limits['max'],
+                window_seconds=limits['window']
             )
-    
-    # Process request
-    response = await call_next(request)
-    
-    # Add security headers
-    response.headers["X-Request-ID"] = request_id
-    response.headers["X-Response-Time"] = f"{(time.time() - start_time)*1000:.1f}ms"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
-    
-    # Content-Security-Policy — last missing security header
-    csp_directives = [
-        "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'",  # React needs inline/eval
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com",
-        "img-src 'self' data: blob: https:",
-        "connect-src 'self' https://api.whatsapp.com https://wa.me https://*.googleapis.com wss: ws:",
-        "media-src 'self' blob:",
-        "worker-src 'self' blob:",
-        "frame-ancestors 'none'",
-    ]
-    response.headers["Content-Security-Policy"] = "; ".join(csp_directives)
-    
-    # HSTS in production
-    if settings.app_env == "production":
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    
-    return response
+            if not allowed:
+                resp = JSONResponse(
+                    status_code=429,
+                    content={
+                        "error": True,
+                        "message": "Too many requests. Please slow down.",
+                        "retry_after": limits['window']
+                    },
+                    headers={"Retry-After": str(limits['window'])}
+                )
+                await resp(scope, receive, send)
+                return
+
+        # Intercept response headers
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = dict(message.get("headers", []))
+                extra = [
+                    (b"x-request-id", request_id.encode()),
+                    (b"x-response-time", f"{(time.time() - start_time)*1000:.1f}ms".encode()),
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"x-frame-options", b"DENY"),
+                    (b"x-xss-protection", b"1; mode=block"),
+                    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+                    (b"permissions-policy", b"camera=(), microphone=(self), geolocation=()"),
+                ]
+                message["headers"] = list(message.get("headers", [])) + extra
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+app.add_middleware(SecurityASGIMiddleware)
 
 
 # API Health check endpoint — production-grade
