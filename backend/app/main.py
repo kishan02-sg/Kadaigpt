@@ -406,13 +406,14 @@ async def global_exception_handler(request, exc):
     error_trace = traceback.format_exc()
     error_msg = f"{type(exc).__name__}: {str(exc)}"
     
-    # Temporarily expose error details for debugging (REMOVE after fixing)
+    # Show beginning of trace (our code) AND end (SQLAlchemy internals)
     return JSONResponse(
         status_code=500,
         content={
             "error": True,
             "message": error_msg,
-            "trace": error_trace[-2000:] if error_trace else "No traceback",
+            "trace_start": error_trace[:2000] if error_trace else "No traceback",
+            "trace_end": error_trace[-1000:] if error_trace else "",
             "path": str(request.url.path)
         }
     )
