@@ -405,7 +405,7 @@ async def global_exception_handler(request, exc):
         content={
             "error": True,
             "message": error_msg,
-            "detail": error_trace[-500:] if error_trace else "No traceback",
+            "trace": error_trace[-2000:] if error_trace else "No traceback",
             "path": str(request.url.path)
         }
     )
