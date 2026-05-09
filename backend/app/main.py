@@ -394,15 +394,19 @@ async def global_exception_handler(request, exc):
         details={"error": type(exc).__name__}
     )
     
-    # Don't expose internal errors in production
-    message = str(exc) if settings.app_env == "development" else "An unexpected error occurred"
+    # Log the full error for debugging
+    import traceback
+    error_trace = traceback.format_exc()
+    error_msg = f"{type(exc).__name__}: {str(exc)}"
     
+    # Temporarily expose error details for debugging (REMOVE after fixing)
     return JSONResponse(
         status_code=500,
         content={
             "error": True,
-            "message": message,
-            "detail": "Internal server error"
+            "message": error_msg,
+            "detail": error_trace[-500:] if error_trace else "No traceback",
+            "path": str(request.url.path)
         }
     )
 
