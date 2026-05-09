@@ -371,69 +371,72 @@ async def create_bill(
             except Exception:
                 pass
     
-    # Get items for response
+    # Get items for response (explicit query to avoid lazy loading)
     items_result = await db.execute(
         select(BillItem).where(BillItem.bill_id == bill.id)
     )
     bill.items = items_result.scalars().all()
     
-    # 🖨️ PRINT AGENT: Auto-print if enabled
-    print_result = None
-    if auto_print:
-        bill_for_print = {
-            "id": bill.id,
-            "bill_number": bill.bill_number,
-            "store_name": store.name if store else "KadaiGPT Store",
-            "items": [
-                {
-                    "product_name": item.product_name,
-                    "quantity": item.quantity,
-                    "total": item.total
-                }
-                for item in bill.items
-            ],
-            "total_amount": bill.total_amount
+    # Build response manually to avoid SQLAlchemy lazy loading in async context
+    response_items = [
+        {
+            "id": item.id,
+            "product_id": item.product_id,
+            "product_name": item.product_name,
+            "product_sku": item.product_sku,
+            "unit_price": item.unit_price,
+            "quantity": item.quantity,
+            "discount_percent": item.discount_percent,
+            "tax_rate": item.tax_rate,
+            "subtotal": item.subtotal,
+            "discount_amount": item.discount_amount,
+            "tax_amount": item.tax_amount,
+            "total": item.total,
         }
-        
-        # Get print decision
-        print_decision = await print_agent.decide_print_strategy(bill_for_print)
-        
-        if print_decision.should_print:
-            # Generate receipt content
-            receipt_content = print_agent.generate_receipt_content(bill_for_print)
-            
-            # Execute silent print
-            print_result = await print_agent.execute_silent_print(
-                receipt_content,
-                print_decision.printer_name
-            )
-            
-            # Update bill print status
-            if print_result.get("success"):
-                bill.is_printed = True
-                bill.print_count = 1
-                await db.commit()
+        for item in bill.items
+    ]
     
-    # Build response
-    response = BillResponse.model_validate(bill)
-    
-    # 📝 AUDIT: Log bill creation
-    await log_audit_event(
-        db=db,
-        store_id=current_user.store_id,
-        user_id=current_user.id,
-        action="create",
-        entity_type="bill",
-        entity_id=bill.id,
-        new_values={
-            "bill_number": bill.bill_number,
-            "total_amount": bill.total_amount,
-            "payment_method": bill.payment_method.value if hasattr(bill.payment_method, 'value') else str(bill.payment_method),
-            "items_count": len(bill.items),
-            "customer_name": bill.customer_name,
-        }
+    response = BillResponse(
+        id=bill.id,
+        store_id=bill.store_id,
+        bill_number=bill.bill_number,
+        bill_date=bill.bill_date or bill.created_at or datetime.utcnow(),
+        customer_name=bill.customer_name,
+        customer_phone=bill.customer_phone,
+        subtotal=bill.subtotal,
+        discount_amount=bill.discount_amount,
+        tax_amount=bill.tax_amount,
+        total_amount=bill.total_amount,
+        payment_method=bill.payment_method,
+        amount_paid=bill.amount_paid,
+        change_amount=bill.change_amount,
+        status=bill.status,
+        is_printed=bill.is_printed or False,
+        print_count=bill.print_count or 0,
+        items=response_items,
+        created_at=bill.created_at or datetime.utcnow(),
     )
-    await db.commit()
+    
+    # 📝 AUDIT: Log bill creation (non-critical, wrapped in try)
+    try:
+        await log_audit_event(
+            db=db,
+            store_id=current_user.store_id,
+            user_id=current_user.id,
+            action="create",
+            entity_type="bill",
+            entity_id=bill.id,
+            new_values={
+                "bill_number": bill.bill_number,
+                "total_amount": bill.total_amount,
+                "payment_method": bill.payment_method.value if hasattr(bill.payment_method, 'value') else str(bill.payment_method),
+                "items_count": len(response_items),
+                "customer_name": bill.customer_name,
+            }
+        )
+        await db.commit()
+    except Exception:
+        pass
     
     return response
 
