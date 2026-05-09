@@ -318,7 +318,13 @@ async def create_bill(
             )
     
     await db.commit()
-    await db.refresh(bill)
+    
+    # Re-fetch bill to get server-generated fields (bill_date, created_at)
+    # Don't use db.refresh() as it triggers lazy loading in async/serverless context
+    refreshed = await db.execute(
+        select(Bill).where(Bill.id == bill.id)
+    )
+    bill = refreshed.scalar_one()
     
     # ⭐ LOYALTY POINTS: Auto-award points to customer (1 point per ₹10 spent)
     if bill_data.customer_phone:
