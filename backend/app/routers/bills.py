@@ -317,132 +317,98 @@ async def create_bill(
                 .values(current_stock=Product.current_stock - update["quantity"])
             )
     
+    # Capture bill_id before commit (flush already gave us the id)
+    bill_id = bill.id
+    bill_store_id = bill.store_id
+    
     await db.commit()
     
-    # Re-fetch bill to get server-generated fields (bill_date, created_at)
-    # Don't use db.refresh() as it triggers lazy loading in async/serverless context
-    refreshed = await db.execute(
-        select(Bill).where(Bill.id == bill.id)
+    # ═══════════════════════════════════════════════════
+    # POST-COMMIT: Use raw SQL to avoid ORM lazy loading (MissingGreenlet fix)
+    # ═══════════════════════════════════════════════════
+    from sqlalchemy import text
+    
+    # Re-fetch bill as raw row (no ORM relationships to lazy-load)
+    bill_row = await db.execute(
+        text("SELECT id, store_id, bill_number, bill_date, customer_name, customer_phone, "
+             "subtotal, discount_amount, tax_amount, total_amount, payment_method, "
+             "amount_paid, change_amount, status, is_printed, print_count, created_at "
+             "FROM bills WHERE id = :bill_id"),
+        {"bill_id": bill_id}
     )
-    bill = refreshed.scalar_one()
+    b = bill_row.mappings().first()
+    
+    # Fetch bill items as raw rows
+    items_row = await db.execute(
+        text("SELECT id, product_id, product_name, product_sku, unit_price, quantity, "
+             "discount_percent, tax_rate, subtotal, discount_amount, tax_amount, total "
+             "FROM bill_items WHERE bill_id = :bill_id"),
+        {"bill_id": bill_id}
+    )
+    raw_items = [dict(row) for row in items_row.mappings().all()]
     
     # ⭐ LOYALTY POINTS: Auto-award points to customer (1 point per ₹10 spent)
     if bill_data.customer_phone:
         try:
-            cust_result = await db.execute(
-                select(Customer).where(
-                    and_(
-                        Customer.store_id == current_user.store_id,
-                        Customer.phone == bill_data.customer_phone
-                    )
-                )
+            points_earned = int(totals["total_amount"] / 10)
+            
+            cust_row = await db.execute(
+                text("SELECT id, name, loyalty_points, total_purchases FROM customers "
+                     "WHERE store_id = :store_id AND phone = :phone"),
+                {"store_id": current_user.store_id, "phone": bill_data.customer_phone}
             )
-            customer = cust_result.scalar_one_or_none()
+            existing = cust_row.mappings().first()
             
-            points_earned = int(totals["total_amount"] / 10)  # 1 point per ₹10
-            
-            if customer:
-                # Existing customer — add points + update purchase total
-                customer.loyalty_points = (customer.loyalty_points or 0) + points_earned
-                customer.total_purchases = (customer.total_purchases or 0) + totals["total_amount"]
-                customer.last_purchase = datetime.utcnow()
-                await db.commit()
-                import logging
-                logging.getLogger(__name__).info(
-                    f"Loyalty: +{points_earned}pts to {customer.name} (phone={bill_data.customer_phone})"
+            if existing:
+                await db.execute(
+                    text("UPDATE customers SET loyalty_points = loyalty_points + :pts, "
+                         "total_purchases = COALESCE(total_purchases, 0) + :total, "
+                         "last_purchase = NOW() WHERE id = :cid"),
+                    {"pts": points_earned, "total": totals["total_amount"], "cid": existing["id"]}
                 )
+                await db.commit()
             else:
-                # New customer — auto-create from bill
-                new_customer = Customer(
-                    store_id=current_user.store_id,
-                    name=bill_data.customer_name or "Walk-in",
-                    phone=bill_data.customer_phone,
-                    loyalty_points=points_earned,
-                    total_purchases=totals["total_amount"],
-                    last_purchase=datetime.utcnow(),
-                    credit=0.0,
+                await db.execute(
+                    text("INSERT INTO customers (store_id, name, phone, loyalty_points, total_purchases, last_purchase, credit) "
+                         "VALUES (:store_id, :name, :phone, :pts, :total, NOW(), 0)"),
+                    {
+                        "store_id": current_user.store_id,
+                        "name": bill_data.customer_name or "Walk-in",
+                        "phone": bill_data.customer_phone,
+                        "pts": points_earned,
+                        "total": totals["total_amount"],
+                    }
                 )
-                db.add(new_customer)
                 await db.commit()
-                import logging
-                logging.getLogger(__name__).info(
-                    f"Loyalty: Created customer '{new_customer.name}' phone={bill_data.customer_phone} +{points_earned}pts"
-                )
         except Exception as e:
             import logging
-            logging.getLogger(__name__).error(f"Loyalty points update FAILED: {type(e).__name__}: {e}")
-            # Don't let loyalty failure break the bill
+            logging.getLogger(__name__).error(f"Loyalty FAILED: {type(e).__name__}: {e}")
             try:
                 await db.rollback()
             except Exception:
                 pass
     
-    # Get items for response (explicit query to avoid lazy loading)
-    items_result = await db.execute(
-        select(BillItem).where(BillItem.bill_id == bill.id)
-    )
-    bill.items = items_result.scalars().all()
-    
-    # Build response manually to avoid SQLAlchemy lazy loading in async context
-    response_items = [
-        {
-            "id": item.id,
-            "product_id": item.product_id,
-            "product_name": item.product_name,
-            "product_sku": item.product_sku,
-            "unit_price": item.unit_price,
-            "quantity": item.quantity,
-            "discount_percent": item.discount_percent,
-            "tax_rate": item.tax_rate,
-            "subtotal": item.subtotal,
-            "discount_amount": item.discount_amount,
-            "tax_amount": item.tax_amount,
-            "total": item.total,
-        }
-        for item in bill.items
-    ]
-    
+    # Build response from raw data (no ORM access)
     response = BillResponse(
-        id=bill.id,
-        store_id=bill.store_id,
-        bill_number=bill.bill_number,
-        bill_date=bill.bill_date or bill.created_at or datetime.utcnow(),
-        customer_name=bill.customer_name,
-        customer_phone=bill.customer_phone,
-        subtotal=bill.subtotal,
-        discount_amount=bill.discount_amount,
-        tax_amount=bill.tax_amount,
-        total_amount=bill.total_amount,
-        payment_method=bill.payment_method,
-        amount_paid=bill.amount_paid,
-        change_amount=bill.change_amount,
-        status=bill.status,
-        is_printed=bill.is_printed or False,
-        print_count=bill.print_count or 0,
-        items=response_items,
-        created_at=bill.created_at or datetime.utcnow(),
+        id=b["id"],
+        store_id=b["store_id"],
+        bill_number=b["bill_number"],
+        bill_date=b["bill_date"] or b["created_at"] or datetime.utcnow(),
+        customer_name=b["customer_name"],
+        customer_phone=b["customer_phone"],
+        subtotal=b["subtotal"],
+        discount_amount=b["discount_amount"],
+        tax_amount=b["tax_amount"],
+        total_amount=b["total_amount"],
+        payment_method=b["payment_method"],
+        amount_paid=b["amount_paid"],
+        change_amount=b["change_amount"],
+        status=b["status"],
+        is_printed=b["is_printed"] or False,
+        print_count=b["print_count"] or 0,
+        items=raw_items,
+        created_at=b["created_at"] or datetime.utcnow(),
     )
-    
-    # 📝 AUDIT: Log bill creation (non-critical, wrapped in try)
-    try:
-        await log_audit_event(
-            db=db,
-            store_id=current_user.store_id,
-            user_id=current_user.id,
-            action="create",
-            entity_type="bill",
-            entity_id=bill.id,
-            new_values={
-                "bill_number": bill.bill_number,
-                "total_amount": bill.total_amount,
-                "payment_method": bill.payment_method.value if hasattr(bill.payment_method, 'value') else str(bill.payment_method),
-                "items_count": len(response_items),
-                "customer_name": bill.customer_name,
-            }
-        )
-        await db.commit()
-    except Exception:
-        pass
     
     return response
 
