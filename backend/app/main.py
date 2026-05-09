@@ -401,20 +401,18 @@ async def global_exception_handler(request, exc):
         details={"error": type(exc).__name__}
     )
     
-    # Log the full error for debugging
-    import traceback
-    error_trace = traceback.format_exc()
-    error_msg = f"{type(exc).__name__}: {str(exc)}"
+    # Log error server-side but don't expose internals to client
+    import logging
+    logging.getLogger(__name__).error(f"Unhandled error on {request.url.path}: {type(exc).__name__}: {exc}")
     
-    # Show beginning of trace (our code) AND end (SQLAlchemy internals)
+    message = str(exc) if settings.app_env == "development" else "An unexpected error occurred"
+    
     return JSONResponse(
         status_code=500,
         content={
             "error": True,
-            "message": error_msg,
-            "trace_start": error_trace[:2000] if error_trace else "No traceback",
-            "trace_end": error_trace[-1000:] if error_trace else "",
-            "path": str(request.url.path)
+            "message": message,
+            "detail": "Internal server error"
         }
     )
 
