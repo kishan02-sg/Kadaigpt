@@ -24,10 +24,10 @@ const OWNER = {
         { id: 'staff',       label: 'Staff',     icon: Users },
         { id: 'bills',       label: 'Bills',     icon: FileText },
         { id: 'products',    label: 'Products',  icon: Package },
-        { id: 'analytics',   label: 'Analytics', icon: BarChart3 },
+        { id: 'customers',   label: 'Customers', icon: Users },
     ],
     moreNav: [
-        { id: 'customers',       label: 'Customers',      icon: Users },
+        { id: 'analytics',       label: 'Analytics',      icon: BarChart3 },
         { id: 'loyalty',         label: 'Loyalty',         icon: Gift },
         { id: 'suppliers',       label: 'Suppliers',       icon: Truck },
         { id: 'expenses',        label: 'Expenses',        icon: Wallet },
