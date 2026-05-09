@@ -216,10 +216,10 @@ function App() {
         // Each role has a whitelist of allowed pages
         // ═══════════════════════════════════════════════════
         const ROLE_PAGES = {
-            owner: ['dashboard', 'bills', 'products', 'customers', 'suppliers',
+            owner: ['dashboard', 'create-bill', 'bills', 'ocr', 'products', 'customers', 'suppliers',
                     'analytics', 'gst', 'daily-summary', 'staff', 'stores',
                     'subscription', 'ai-insights', 'settings', 'whatsapp',
-                    'loyalty', 'expenses', 'privacy', 'terms'],
+                    'loyalty', 'expenses', 'bulk-operations', 'privacy', 'terms'],
             manager: ['dashboard', 'create-bill', 'bills', 'ocr', 'products',
                       'customers', 'suppliers', 'analytics', 'gst', 'daily-summary',
                       'expenses', 'staff', 'whatsapp', 'loyalty', 'ai-insights',
