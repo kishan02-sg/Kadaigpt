@@ -403,37 +403,6 @@ async def reset_password(
 # USER PROFILE ENDPOINT
 # ═══════════════════════════════════════════
 
-@router.get("/me-debug")
-async def debug_me(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db)
-):
-    """Debug endpoint - raw SQL only, no ORM dependencies"""
-    from sqlalchemy import text
-    import traceback
-    try:
-        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
-        uid = int(payload.get("sub", 0))
-        result = await db.execute(
-            text("SELECT id, email, full_name, role, phone, staff_id, is_active, store_id FROM users WHERE id = :uid"),
-            {"uid": uid}
-        )
-        row = result.mappings().first()
-        if not row:
-            return {"error": "user_not_found", "uid": uid}
-        return {
-            "id": row["id"],
-            "email": row["email"],
-            "full_name": row["full_name"],
-            "role": str(row["role"]),
-            "phone": row["phone"],
-            "staff_id": row["staff_id"],
-            "is_active": row["is_active"],
-            "store_id": row["store_id"],
-        }
-    except Exception as e:
-        return {"error": str(e), "traceback": traceback.format_exc()}
-
 
 @router.get("/me")
 async def get_current_user_profile(
