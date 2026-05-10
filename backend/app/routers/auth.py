@@ -127,8 +127,9 @@ async def get_current_user(
     if not row["is_active"]:
         raise HTTPException(status_code=400, detail="Inactive user")
     
-    # Construct a User-like object from the raw SQL row
-    user = User(
+    # Use SimpleNamespace to avoid SQLAlchemy session context issues
+    from types import SimpleNamespace
+    user = SimpleNamespace(
         id=row["id"],
         store_id=row["store_id"],
         email=row["email"],
@@ -141,8 +142,6 @@ async def get_current_user(
         last_login=row["last_login"],
         created_at=row["created_at"],
     )
-    # Set the id explicitly (not auto-generated)
-    user.id = row["id"]
     
     return user
 
@@ -678,16 +677,19 @@ async def change_password(
     db: AsyncSession = Depends(get_db)
 ):
     """Change password for the current user"""
+    from sqlalchemy import text
+
     if not verify_password(request.current_password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
 
-    current_user.password_hash = get_password_hash(request.new_password)
-    # Clear the must_change_password flag if set
-    if hasattr(current_user, 'must_change_password'):
-        current_user.must_change_password = False
+    new_hash = get_password_hash(request.new_password)
+    await db.execute(
+        text("UPDATE users SET password_hash = :pw WHERE id = :uid"),
+        {"pw": new_hash, "uid": current_user.id}
+    )
     await db.commit()
 
     return {"message": "Password changed successfully", "success": True}
