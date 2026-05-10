@@ -199,6 +199,13 @@ function App() {
             localStorage.removeItem('kadai_demo_mode')
         }
         setUser(userData)
+        // Set role from login response — critical for role-based nav
+        const role = (userData.role || 'owner').toLowerCase()
+        setUserRole(role)
+        localStorage.setItem('kadai_user_role', role)
+        // Navigate to the correct default page for this role
+        const defaultPage = getRoleDefaultPage(role)
+        setCurrentPage(defaultPage)
         addToast(`Welcome, ${userData.username || userData.full_name || 'User'}!`, 'success')
     }
 
