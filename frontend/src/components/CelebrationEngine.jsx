@@ -12,13 +12,17 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
+// Language helper — checks localStorage for user's language preference
+const getLang = () => (localStorage.getItem('kadai_language') || 'en').toLowerCase()
+const isHindi = () => getLang() === 'hi'
+
 const MILESTONES = {
-    FIRST_BILL: { key: 'first_bill', emoji: '🎊', title: 'पहला बिल बन गया!', subtitle: 'First bill created!', message: 'देखा? इतना आसान है! (See? That easy!)', color: '#10b981' },
-    TENTH_BILL: { key: 'tenth_bill', emoji: '🏅', title: '10 बिल पूरे!', subtitle: '10 bills completed!', message: 'आप तो एक्सपर्ट बन रहे हैं! (You\'re becoming an expert!)', color: '#f59e0b' },
-    FIFTIETH_BILL: { key: 'fiftieth_bill', emoji: '⭐', title: '50 बिल — Pro Status!', subtitle: '50 bills — you\'re a pro!', message: 'अब तो आप प्रोफेशनल हो गए! (You\'re a professional now!)', color: '#8b5cf6' },
-    FIRST_OFFLINE: { key: 'first_offline', emoji: '📡', title: 'ऑफ़लाइन भी चलता है!', subtitle: 'Works offline too!', message: 'इंटरनेट के बिना भी बिल बना! (Bill created without internet!)', color: '#3b82f6' },
-    REVENUE_1L: { key: 'revenue_1l', emoji: '🥇', title: '₹1 लाख की बिक्री!', subtitle: '₹1 Lakh revenue milestone!', message: 'कड़ी मेहनत रंग ला रही है! (Hard work is paying off!)', color: '#eab308' },
-    FIRST_WEEK: { key: 'first_week', emoji: '📊', title: 'पहला हफ्ता पूरा!', subtitle: 'First week completed!', message: 'आपकी पहली Weekly Report तैयार है! (Your first weekly report is ready!)', color: '#06b6d4' },
+    FIRST_BILL: { key: 'first_bill', emoji: '🎊', title_en: 'First Bill Created!', title_hi: 'पहला बिल बन गया!', message_en: 'See? That easy!', message_hi: 'देखा? इतना आसान है!', color: '#10b981' },
+    TENTH_BILL: { key: 'tenth_bill', emoji: '🏅', title_en: '10 Bills Completed!', title_hi: '10 बिल पूरे!', message_en: 'You\'re becoming an expert!', message_hi: 'आप तो एक्सपर्ट बन रहे हैं!', color: '#f59e0b' },
+    FIFTIETH_BILL: { key: 'fiftieth_bill', emoji: '⭐', title_en: '50 Bills — Pro Status!', title_hi: '50 बिल — Pro Status!', message_en: 'You\'re a professional now!', message_hi: 'अब तो आप प्रोफेशनल हो गए!', color: '#8b5cf6' },
+    FIRST_OFFLINE: { key: 'first_offline', emoji: '📡', title_en: 'Works Offline Too!', title_hi: 'ऑफ़लाइन भी चलता है!', message_en: 'Bill created without internet!', message_hi: 'इंटरनेट के बिना भी बिल बना!', color: '#3b82f6' },
+    REVENUE_1L: { key: 'revenue_1l', emoji: '🥇', title_en: '₹1 Lakh Revenue!', title_hi: '₹1 लाख की बिक्री!', message_en: 'Hard work is paying off!', message_hi: 'कड़ी मेहनत रंग ला रही है!', color: '#eab308' },
+    FIRST_WEEK: { key: 'first_week', emoji: '📊', title_en: 'First Week Done!', title_hi: 'पहला हफ्ता पूरा!', message_en: 'Your first weekly report is ready!', message_hi: 'आपकी पहली Weekly Report तैयार है!', color: '#06b6d4' },
 }
 
 // Simple confetti particle system
@@ -204,19 +208,14 @@ export default function CelebrationEngine({ children }) {
                             fontSize: '22px', fontWeight: 800, color: '#1a1a2e',
                             margin: '0 0 4px 0', lineHeight: 1.3,
                         }}>
-                            {currentCelebration.title}
+                            {isHindi() ? currentCelebration.title_hi : currentCelebration.title_en}
                         </h2>
-                        <p style={{
-                            fontSize: '14px', color: '#64748b', margin: '0 0 12px 0',
-                            fontWeight: 500,
-                        }}>
-                            {currentCelebration.subtitle}
-                        </p>
+
                         <p style={{
                             fontSize: '16px', color: currentCelebration.color,
                             fontWeight: 600, margin: '0 0 24px 0',
                         }}>
-                            {currentCelebration.message}
+                            {isHindi() ? currentCelebration.message_hi : currentCelebration.message_en}
                         </p>
                         <button
                             onClick={dismiss}
@@ -227,7 +226,7 @@ export default function CelebrationEngine({ children }) {
                                 minHeight: '48px', minWidth: '160px',
                             }}
                         >
-                            बहुत बढ़िया! ✨
+                            {isHindi() ? 'बहुत बढ़िया! ✨' : 'Awesome! ✨'}
                         </button>
                     </div>
                 </div>
