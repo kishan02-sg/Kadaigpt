@@ -89,6 +89,8 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db)
 ) -> User:
     """Get current authenticated user from JWT token"""
+    from sqlalchemy import text
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -111,15 +113,36 @@ async def get_current_user(
         logger.warning(f"JWT validation failed: {type(e).__name__}")
         raise credentials_exception
     
-    result = await db.execute(select(User).where(User.id == token_data.user_id))
-    user = result.scalar_one_or_none()
+    # Use raw SQL to avoid MissingGreenlet on Vercel serverless
+    result = await db.execute(
+        text("SELECT id, store_id, email, phone, password_hash, staff_id, full_name, role, is_active, last_login, created_at FROM users WHERE id = :uid"),
+        {"uid": token_data.user_id}
+    )
+    row = result.mappings().first()
     
-    if user is None:
+    if row is None:
         logger.warning(f"Token valid but user not found (id: {token_data.user_id})")
         raise credentials_exception
     
-    if not user.is_active:
+    if not row["is_active"]:
         raise HTTPException(status_code=400, detail="Inactive user")
+    
+    # Construct a User-like object from the raw SQL row
+    user = User(
+        id=row["id"],
+        store_id=row["store_id"],
+        email=row["email"],
+        phone=row["phone"],
+        password_hash=row["password_hash"],
+        staff_id=row["staff_id"],
+        full_name=row["full_name"],
+        role=UserRole(row["role"]) if row["role"] else UserRole.CASHIER,
+        is_active=row["is_active"],
+        last_login=row["last_login"],
+        created_at=row["created_at"],
+    )
+    # Set the id explicitly (not auto-generated)
+    user.id = row["id"]
     
     return user
 
@@ -401,36 +424,57 @@ async def get_current_user_profile(
     """Get current user profile — called after login to get role, name, store info"""
     from sqlalchemy import text
 
-    # Always return role even if store query fails
-    store_data = None
+    # Use raw SQL to avoid any ORM lazy-loading / MissingGreenlet issues
     try:
-        if current_user.store_id:
-            result = await db.execute(
-                text("SELECT id, name, address, phone, gst_number FROM stores WHERE id = :sid"),
-                {"sid": current_user.store_id}
-            )
-            row = result.mappings().first()
-            if row:
-                store_data = {
-                    "id": row["id"],
-                    "name": row["name"],
-                    "address": row["address"],
-                    "phone": row["phone"],
-                    "gst_number": row["gst_number"],
-                }
-    except Exception as e:
-        print(f"[Auth/me] Store fetch error (non-fatal): {e}")
+        # Get user data via raw SQL (in case ORM attrs trigger lazy load)
+        user_result = await db.execute(
+            text("SELECT id, email, full_name, role, phone, staff_id, is_active, store_id, language, theme, last_login, created_at FROM users WHERE id = :uid"),
+            {"uid": current_user.id}
+        )
+        user_row = user_result.mappings().first()
 
-    return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "full_name": current_user.full_name,
-        "role": current_user.role.value if current_user.role else "CASHIER",
-        "phone": current_user.phone,
-        "staff_id": current_user.staff_id,
-        "is_active": current_user.is_active,
-        "store": store_data
-    }
+        if not user_row:
+            return {"id": current_user.id, "role": "CASHIER", "full_name": "User", "store": None}
+
+        # Get store data
+        store_data = None
+        if user_row["store_id"]:
+            store_result = await db.execute(
+                text("SELECT id, name, address, phone, gst_number FROM stores WHERE id = :sid"),
+                {"sid": user_row["store_id"]}
+            )
+            store_row = store_result.mappings().first()
+            if store_row:
+                store_data = dict(store_row)
+
+        return {
+            "id": user_row["id"],
+            "email": user_row["email"],
+            "full_name": user_row["full_name"],
+            "role": user_row["role"],
+            "phone": user_row["phone"],
+            "staff_id": user_row["staff_id"],
+            "is_active": user_row["is_active"],
+            "store_id": user_row["store_id"],
+            "language": user_row.get("language", "en"),
+            "theme": user_row.get("theme", "dark"),
+            "last_login": str(user_row["last_login"]) if user_row["last_login"] else None,
+            "created_at": str(user_row["created_at"]) if user_row["created_at"] else None,
+            "store": store_data
+        }
+    except Exception as e:
+        print(f"[Auth/me] Error: {e}")
+        # Absolute fallback — at minimum return the role
+        try:
+            role_val = current_user.role.value if current_user.role else "CASHIER"
+        except:
+            role_val = "CASHIER"
+        return {
+            "id": getattr(current_user, 'id', 0),
+            "role": role_val,
+            "full_name": getattr(current_user, 'full_name', 'User'),
+            "store": None
+        }
 
 
 # ═══════════════════════════════════════════
