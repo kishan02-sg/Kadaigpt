@@ -113,35 +113,25 @@ async def get_current_user(
         logger.warning(f"JWT validation failed: {type(e).__name__}")
         raise credentials_exception
     
-    # Use raw SQL to avoid MissingGreenlet on Vercel serverless
+    # Use ORM query with eager load options to prevent MissingGreenlet
+    from sqlalchemy.orm import load_only
     result = await db.execute(
-        text("SELECT id, store_id, email, phone, password_hash, staff_id, full_name, role, is_active, last_login, created_at FROM users WHERE id = :uid"),
-        {"uid": token_data.user_id}
+        select(User)
+        .options(load_only(
+            User.id, User.store_id, User.email, User.phone, User.password_hash,
+            User.staff_id, User.full_name, User.role, User.is_active,
+            User.last_login, User.created_at, User.language, User.theme
+        ))
+        .where(User.id == token_data.user_id)
     )
-    row = result.mappings().first()
+    user = result.scalar_one_or_none()
     
-    if row is None:
+    if user is None:
         logger.warning(f"Token valid but user not found (id: {token_data.user_id})")
         raise credentials_exception
     
-    if not row["is_active"]:
+    if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
-    
-    # Use SimpleNamespace to avoid SQLAlchemy session context issues
-    from types import SimpleNamespace
-    user = SimpleNamespace(
-        id=row["id"],
-        store_id=row["store_id"],
-        email=row["email"],
-        phone=row["phone"],
-        password_hash=row["password_hash"],
-        staff_id=row["staff_id"],
-        full_name=row["full_name"],
-        role=UserRole(row["role"]) if row["role"] else UserRole.CASHIER,
-        is_active=row["is_active"],
-        last_login=row["last_login"],
-        created_at=row["created_at"],
-    )
     
     return user
 
@@ -673,7 +663,7 @@ class ChangePasswordRequest(BaseModel):
 @router.put("/change-password")
 async def change_password(
     request: ChangePasswordRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Change password for the current user"""
