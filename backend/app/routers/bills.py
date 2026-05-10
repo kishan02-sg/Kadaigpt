@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 
 from app.database import get_db
@@ -552,7 +552,8 @@ async def get_today_analytics(
     db: AsyncSession = Depends(get_db)
 ):
     """Get today's sales analytics (Manager/Owner only)"""
-    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    IST = timezone(timedelta(hours=5, minutes=30))
+    today_start = datetime.now(IST).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
     today_end = today_start + timedelta(days=1)
     
     # Today's bills

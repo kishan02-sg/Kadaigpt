@@ -14,7 +14,7 @@ FIXED: All column references now match actual model definitions
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from app.database import get_db
@@ -32,7 +32,9 @@ async def get_dashboard_stats(
     """
     Get dashboard statistics for the current user's store
     """
-    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    # Use IST (UTC+5:30) for "today" — Vercel runs in UTC
+    IST = timezone(timedelta(hours=5, minutes=30))
+    today = datetime.now(IST).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
     
     try:
         # Get today's completed bills for the store
@@ -257,7 +259,8 @@ async def get_ai_insights(
             })
         
         # Sales insight
-        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        IST = timezone(timedelta(hours=5, minutes=30))
+        today = datetime.now(IST).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
         bills_result = await db.execute(
             select(func.count(Bill.id), func.sum(Bill.total_amount))
             .where(

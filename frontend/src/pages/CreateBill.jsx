@@ -475,6 +475,9 @@ export default function CreateBill({ addToast, setCurrentPage }) {
       // Invalidate cache so Bills/Dashboard pages get fresh data immediately
       realDataService.invalidateCache()
 
+      // Re-fetch products in background to get accurate stock from server
+      setTimeout(() => loadProducts(), 1500)
+
     } catch (error) {
       console.error('❌ Error saving bill:', error)
 
