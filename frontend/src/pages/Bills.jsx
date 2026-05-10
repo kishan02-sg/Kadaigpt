@@ -56,9 +56,15 @@ export default function Bills({ addToast, setCurrentPage }) {
 
         if (!searchMatch) return false
 
-        // Payment mode filter (case-insensitive)
-        if (filters.paymentMode !== 'all' && bill.payment_mode?.toLowerCase() !== filters.paymentMode.toLowerCase()) {
-            return false
+        // Payment mode filter (case-insensitive) — 'due' matches 'credit' in DB
+        if (filters.paymentMode !== 'all') {
+            const filterVal = filters.paymentMode.toLowerCase()
+            const billPay = bill.payment_mode?.toLowerCase() || ''
+            if (filterVal === 'due') {
+                if (billPay !== 'credit' && billPay !== 'due') return false
+            } else if (billPay !== filterVal) {
+                return false
+            }
         }
 
         // Amount filters
@@ -321,7 +327,7 @@ export default function Bills({ addToast, setCurrentPage }) {
                                 <option value="cash">Cash</option>
                                 <option value="upi">UPI</option>
                                 <option value="card">Card</option>
-                                <option value="credit">Credit</option>
+                                <option value="credit">Due / Credit</option>
                             </select>
                         </div>
                         <div className="form-group">
@@ -374,7 +380,7 @@ export default function Bills({ addToast, setCurrentPage }) {
                                         </td>
                                         <td><span className="items-count">{bill.items_count || bill.items?.length || 0} items</span></td>
                                         <td><span className="amount">₹{bill.total?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></td>
-                                        <td><span className={`badge badge-${bill.payment_mode?.toLowerCase() === 'cash' ? 'success' : bill.payment_mode?.toLowerCase() === 'upi' ? 'info' : 'warning'}`}>{bill.payment_mode}</span></td>
+                                        <td><span className={`badge badge-${bill.payment_mode?.toLowerCase() === 'cash' ? 'success' : bill.payment_mode?.toLowerCase() === 'upi' ? 'info' : bill.payment_mode?.toLowerCase() === 'credit' ? 'error' : 'warning'}`}>{bill.payment_mode?.toLowerCase() === 'credit' ? 'DUE' : bill.payment_mode}</span></td>
                                         <td>
                                             <span className={`badge badge-${bill.status === 'cancelled' ? 'danger' : bill.status === 'refunded' ? 'warning' : 'success'}`}>
                                                 {bill.status === 'cancelled' ? '❌ Cancelled' : bill.status === 'refunded' ? '↩️ Refunded' : '✅ Completed'}
@@ -468,7 +474,7 @@ export default function Bills({ addToast, setCurrentPage }) {
                                             <div className="total-row"><span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span></div>
                                             <div className="total-row"><span>GST ({(gstRate * 100).toFixed(0)}%)</span><span>₹{tax.toFixed(2)}</span></div>
                                             <div className="total-row grand"><span>Grand Total</span><span>₹{total.toFixed(2)}</span></div>
-                                            <div className="total-row"><span>Payment Mode</span><span className="badge badge-info">{selectedBill.payment_mode}</span></div>
+                                            <div className="total-row"><span>Payment Mode</span><span className={`badge ${selectedBill.payment_mode?.toLowerCase() === 'credit' ? 'badge-error' : 'badge-info'}`}>{selectedBill.payment_mode?.toLowerCase() === 'credit' ? 'DUE' : selectedBill.payment_mode}</span></div>
                                         </>
                                     )
                                 })()}

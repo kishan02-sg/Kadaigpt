@@ -261,8 +261,8 @@ export default function CreateBill({ addToast, setCurrentPage }) {
     customer_name: customer.name || 'Walk-in Customer',
     customer_phone: customer.phone || '',
 
-    // API requires payment_method enum (lowercase)
-    payment_method: paymentMode.toLowerCase(),
+    // API requires payment_method enum (lowercase) — Due maps to credit
+    payment_method: paymentMode.toLowerCase() === 'due' ? 'credit' : paymentMode.toLowerCase(),
     amount_paid: total,
 
     // Items in API format
@@ -338,8 +338,8 @@ export default function CreateBill({ addToast, setCurrentPage }) {
     console.log('📝 Bill data:', billData)
     console.log('📝 Using demo data:', usingDemoData)
 
-    // Credit limit enforcement
-    if (paymentMode === 'Credit') {
+    // Credit/Due limit enforcement
+    if (paymentMode === 'Credit' || paymentMode === 'Due') {
       if (!customer.phone) {
         addToast('⚠️ Customer phone is required for credit sales', 'error')
         return
@@ -434,7 +434,7 @@ export default function CreateBill({ addToast, setCurrentPage }) {
 
           if (matchedCustomer) {
             console.log('👤 Updating existing customer:', matchedCustomer.id)
-            const creditToAdd = paymentMode.toLowerCase() === 'credit' ? total : 0
+            const creditToAdd = (paymentMode.toLowerCase() === 'credit' || paymentMode.toLowerCase() === 'due') ? total : 0
             const newLoyalty = Math.max(0, (matchedCustomer.loyalty_points || 0) + loyaltyPointsEarned - pointsToDeduct)
 
             await api.updateCustomer(matchedCustomer.id, {
@@ -447,7 +447,7 @@ export default function CreateBill({ addToast, setCurrentPage }) {
             addToast(`+${loyaltyPointsEarned} points earned!`, 'success')
           } else {
             console.log('👤 Creating new customer')
-            const creditAmount = paymentMode.toLowerCase() === 'credit' ? total : 0
+            const creditAmount = (paymentMode.toLowerCase() === 'credit' || paymentMode.toLowerCase() === 'due') ? total : 0
 
             const newCustomer = await api.createCustomer({
               name: customer.name || 'Walk-in Customer',
@@ -818,7 +818,7 @@ export default function CreateBill({ addToast, setCurrentPage }) {
               </div>
               {/* Row 4: Payment pills — tiny */}
               <div className="cf-pay">
-                {['Cash', 'UPI', 'Card', 'Credit'].map(m => (
+                {['Cash', 'UPI', 'Card', 'Due'].map(m => (
                   <button key={m} className={paymentMode === m ? 'active' : ''} onClick={() => setPaymentMode(m)}>{m}</button>
                 ))}
               </div>
@@ -927,7 +927,7 @@ export default function CreateBill({ addToast, setCurrentPage }) {
               <div className="payment-options">
                 <label className="form-label">Payment Method</label>
                 <div className="payment-buttons">
-                  {['Cash', 'UPI', 'Card', 'Credit'].map(mode => (
+                  {['Cash', 'UPI', 'Card', 'Due'].map(mode => (
                     <button
                       key={mode}
                       className={`payment-btn ${paymentMode === mode ? 'active' : ''}`}
