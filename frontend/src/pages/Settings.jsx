@@ -324,6 +324,69 @@ export default function Settings({ addToast }) {
                     </div>
                 </div>
 
+                {/* Change Password */}
+                <div className="card settings-card">
+                    <div className="card-header">
+                        <h3 className="card-title"><Key size={20} /> Change Password</h3>
+                    </div>
+                    <div className="settings-form">
+                        <div className="form-group">
+                            <label className="form-label">Current Password</label>
+                            <input
+                                type="password"
+                                className="form-input"
+                                id="current-password"
+                                placeholder="Enter current password"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">New Password</label>
+                            <input
+                                type="password"
+                                className="form-input"
+                                id="new-password"
+                                placeholder="Min 6 characters"
+                                minLength={6}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Confirm New Password</label>
+                            <input
+                                type="password"
+                                className="form-input"
+                                id="confirm-password"
+                                placeholder="Re-enter new password"
+                                minLength={6}
+                            />
+                        </div>
+                        <button className="btn btn-primary" onClick={async () => {
+                            const currentPw = document.getElementById('current-password').value
+                            const newPw = document.getElementById('new-password').value
+                            const confirmPw = document.getElementById('confirm-password').value
+                            if (!currentPw || !newPw) {
+                                addToast('Please fill in all fields', 'error'); return
+                            }
+                            if (newPw.length < 6) {
+                                addToast('New password must be at least 6 characters', 'error'); return
+                            }
+                            if (newPw !== confirmPw) {
+                                addToast('New passwords do not match', 'error'); return
+                            }
+                            try {
+                                await api.changePassword(currentPw, newPw)
+                                addToast('Password changed successfully!', 'success')
+                                document.getElementById('current-password').value = ''
+                                document.getElementById('new-password').value = ''
+                                document.getElementById('confirm-password').value = ''
+                            } catch (err) {
+                                addToast(err.message || 'Failed to change password', 'error')
+                            }
+                        }}>
+                            <Key size={18} /> Change Password
+                        </button>
+                    </div>
+                </div>
+
                 {/* Printer Settings */}
                 <div className="card settings-card">
                     <div className="card-header">

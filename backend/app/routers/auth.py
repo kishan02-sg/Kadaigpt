@@ -399,28 +399,37 @@ async def get_current_user_profile(
     db: AsyncSession = Depends(get_db)
 ):
     """Get current user profile — called after login to get role, name, store info"""
-    # Fetch store info
-    store = None
-    if current_user.store_id:
-        from app.models import Store
-        result = await db.execute(select(Store).where(Store.id == current_user.store_id))
-        store = result.scalar_one_or_none()
+    from sqlalchemy import text
+
+    # Always return role even if store query fails
+    store_data = None
+    try:
+        if current_user.store_id:
+            result = await db.execute(
+                text("SELECT id, name, address, phone, gst_number FROM stores WHERE id = :sid"),
+                {"sid": current_user.store_id}
+            )
+            row = result.mappings().first()
+            if row:
+                store_data = {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "address": row["address"],
+                    "phone": row["phone"],
+                    "gst_number": row["gst_number"],
+                }
+    except Exception as e:
+        print(f"[Auth/me] Store fetch error (non-fatal): {e}")
 
     return {
         "id": current_user.id,
         "email": current_user.email,
         "full_name": current_user.full_name,
-        "role": current_user.role.value if current_user.role else "cashier",
+        "role": current_user.role.value if current_user.role else "CASHIER",
         "phone": current_user.phone,
         "staff_id": current_user.staff_id,
         "is_active": current_user.is_active,
-        "store": {
-            "id": store.id,
-            "name": store.name,
-            "address": store.address,
-            "phone": store.phone,
-            "gst_number": store.gst_number,
-        } if store else None
+        "store": store_data
     }
 
 
