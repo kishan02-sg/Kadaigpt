@@ -48,11 +48,17 @@ const MANAGER = {
     nav: [
         { id: 'dashboard',   label: 'Dashboard', icon: Home },
         { id: 'create-bill', label: 'New Bill',  icon: Plus, primary: true },
+        { id: 'bills',       label: 'Bills',     icon: FileText },
         { id: 'products',    label: 'Products',  icon: Package },
-        { id: 'analytics',   label: 'Analytics', icon: BarChart3 },
+        { id: 'customers',   label: 'Customers', icon: Users },
         { id: 'staff',       label: 'Staff',     icon: Users },
     ],
-    moreNav: [],
+    moreNav: [
+        { id: 'analytics',   label: 'Analytics',  icon: BarChart3 },
+        { id: 'suppliers',   label: 'Suppliers',  icon: Truck },
+        { id: 'expenses',    label: 'Expenses',   icon: Wallet },
+        { id: 'settings',    label: 'Settings',   icon: SettingsIcon },
+    ],
 }
 
 // ─────────────────────────────────────────────────────
