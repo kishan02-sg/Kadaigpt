@@ -268,29 +268,36 @@ async def login(
     return Token(access_token=access_token, token_type="bearer")
 
 
-@router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_active_user)):
-    """
-    Get current user profile
-    """
-    return current_user
+# NOTE: The main /me endpoint is defined below (uses raw SQL to avoid MissingGreenlet)
 
-
-@router.get("/me/store", response_model=StoreResponse)
+@router.get("/me/store")
 async def get_my_store(
-    current_user: User = Depends(get_current_active_user),
+    token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    Get current user's store details
-    """
-    result = await db.execute(select(Store).where(Store.id == current_user.store_id))
-    store = result.scalar_one_or_none()
+    """Get current user's store details — raw SQL to avoid MissingGreenlet"""
+    from sqlalchemy import text
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        uid = int(payload.get("sub", 0))
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
     
+    # Get user's store_id
+    user_result = await db.execute(text("SELECT store_id FROM users WHERE id = :uid"), {"uid": uid})
+    user_row = user_result.mappings().first()
+    if not user_row or not user_row["store_id"]:
+        raise HTTPException(status_code=404, detail="Store not found")
+    
+    store_result = await db.execute(
+        text("SELECT id, name, address, phone, gst_number, created_at FROM stores WHERE id = :sid"),
+        {"sid": user_row["store_id"]}
+    )
+    store = store_result.mappings().first()
     if not store:
         raise HTTPException(status_code=404, detail="Store not found")
     
-    return store
+    return dict(store)
 
 
 @router.post("/logout")
