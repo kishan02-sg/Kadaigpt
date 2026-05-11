@@ -1693,11 +1693,11 @@ export default function CreateBill({ addToast, setCurrentPage }) {
           }
           .header-left .page-title { font-size: 1.1rem; }
           
-          /* On mobile: Products on TOP, Cart on BOTTOM (fixed) */
+          /* Products on top, scrollable */
           .products-section {
             overflow: visible;
             padding: 10px 12px;
-            padding-bottom: 360px; /* Space for fixed cart */
+            padding-bottom: 320px;
           }
 
           .product-filters { margin-bottom: 8px; }
@@ -1718,7 +1718,7 @@ export default function CreateBill({ addToast, setCurrentPage }) {
           .cat-tab {
             white-space: nowrap;
             flex-shrink: 0;
-            padding: 6px 12px;
+            padding: 7px 14px;
             font-size: 0.75rem;
           }
           
@@ -1734,29 +1734,35 @@ export default function CreateBill({ addToast, setCurrentPage }) {
           .product-price { font-size: 0.85rem; }
           .product-stock { font-size: 0.6rem; }
           .product-category-tag { font-size: 0.55rem; padding: 1px 6px; }
-          .add-btn { width: 26px; height: 26px; top: 6px; right: 6px; }
+          .add-btn { width: 28px; height: 28px; top: 6px; right: 6px; }
           
+          /* Cart: fixed above mobile nav bar */
           .cart-panel {
             position: fixed;
-            bottom: 65px;
+            bottom: 56px;
             left: 0;
             right: 0;
             width: 100%;
             min-width: unset;
             height: auto;
-            max-height: 60vh;
+            max-height: 55vh;
             z-index: 100;
             border-right: none;
             border-top: 2px solid var(--primary-400);
             border-radius: 20px 20px 0 0;
             box-shadow: 0 -6px 30px rgba(0,0,0,0.35);
-            order: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
           }
 
           .cart-header {
             padding: 8px 14px;
             font-size: 0.82rem;
             border-radius: 20px 20px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--bg-card);
           }
 
           .cart-customer-row {
@@ -1764,37 +1770,79 @@ export default function CreateBill({ addToast, setCurrentPage }) {
             gap: 4px;
           }
           .cart-customer-row input {
-            padding: 7px 8px;
-            font-size: 0.78rem;
+            padding: 8px;
+            font-size: 0.8rem;
           }
           
           .cart-items {
-            max-height: 200px;
+            max-height: 150px;
             padding: 6px 8px;
+            overflow-y: auto;
           }
 
           .cart-item { padding: 8px 10px; margin-bottom: 5px; }
-          .ci-name { font-size: 0.85rem; }
-          .ci-price { font-size: 0.88rem; }
+          .ci-name { font-size: 0.82rem; }
+          .ci-price { font-size: 0.85rem; }
           .ci-rate { font-size: 0.7rem; }
-          .ci-qty button { width: 30px; height: 30px; font-size: 1rem; }
+          .ci-qty button { width: 32px; height: 32px; font-size: 1rem; }
           .ci-qty input { width: 42px; font-size: 0.82rem; }
           .ci-qty select { font-size: 0.68rem; }
 
           .cart-footer-compact { padding: 6px 10px; gap: 4px; }
-          .cf-controls { font-size: 0.68rem; gap: 8px; }
-          .cf-controls input { width: 36px; padding: 3px; font-size: 0.72rem; }
-          .cf-controls select { padding: 3px; font-size: 0.72rem; }
+          .cf-controls { font-size: 0.7rem; gap: 8px; }
+          .cf-controls input { width: 40px; padding: 4px; font-size: 0.72rem; }
+          .cf-controls select { padding: 4px; font-size: 0.72rem; }
           .cf-summary { font-size: 0.72rem; }
           .cf-total { padding: 6px 12px; font-size: 0.82rem; }
           .cf-total-amt { font-size: 1.15rem; }
-          .cf-pay { gap: 3px; }
-          .cf-pay button { padding: 5px 2px; font-size: 0.7rem; }
-          .cf-generate { padding: 10px; font-size: 0.88rem; }
+          .cf-pay { gap: 4px; }
+          .cf-pay button { padding: 6px 4px; font-size: 0.72rem; min-height: 34px; }
+          .cf-generate { 
+            padding: 12px; 
+            font-size: 0.9rem;
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+            border-radius: 0;
+          }
 
-          /* Modals on mobile */
-          .modal { margin: 16px; max-width: calc(100vw - 32px) !important; }
-          .payment-modal, .preview-modal, .qty-modal { max-width: calc(100vw - 32px) !important; }
+          /* Modals: slide up from bottom on mobile */
+          .modal-overlay {
+            align-items: flex-end !important;
+            padding: 0 !important;
+          }
+          .modal { 
+            margin: 0 !important; 
+            max-width: 100vw !important; 
+            width: 100% !important;
+            border-radius: 20px 20px 0 0 !important;
+            max-height: 90vh;
+            overflow-y: auto;
+          }
+          .payment-modal, .preview-modal, .qty-modal { 
+            max-width: 100vw !important; 
+            width: 100% !important;
+          }
+          .payment-modal .modal-body { padding: 16px; }
+          .payment-buttons { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+          .payment-btn { padding: 12px 8px; font-size: 0.8rem; }
+          .payment-modal .modal-footer { 
+            flex-wrap: wrap; 
+            gap: 8px; 
+            padding: 12px 16px;
+            position: sticky;
+            bottom: 0;
+            background: var(--bg-card);
+            border-top: 1px solid var(--border-subtle);
+          }
+          .payment-modal .modal-footer .btn { 
+            flex: 1 1 calc(33% - 6px); 
+            min-width: 80px;
+            font-size: 0.75rem; 
+            padding: 10px 8px; 
+          }
+          .bill-success { padding: 16px 0 12px; }
+          .bill-amount { font-size: 1.75rem; }
         }
 
         /* Extra small screens */
@@ -1806,8 +1854,9 @@ export default function CreateBill({ addToast, setCurrentPage }) {
           .product-item { padding: 8px; }
           .product-name { font-size: 0.75rem; }
           .product-price { font-size: 0.8rem; }
-          .cart-panel { max-height: 65vh; }
-          .cart-items { max-height: 180px; }
+          .cart-panel { max-height: 60vh; bottom: 56px; }
+          .cart-items { max-height: 130px; }
+          .products-section { padding-bottom: 340px; }
         }
       `}</style>
     </div>
