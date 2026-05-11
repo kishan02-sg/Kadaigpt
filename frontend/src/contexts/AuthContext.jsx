@@ -161,7 +161,7 @@ export function AuthProvider({ children }) {
 
             setUser(userData)
             setIsAuthenticated(true)
-            localStorage.setItem('kadai_user_role', userData.role || 'owner')
+            localStorage.setItem('kadai_user_role', (userData.role || 'owner').toLowerCase())
 
             // Get store info
             if (userData.store_id) {
@@ -206,7 +206,7 @@ export function AuthProvider({ children }) {
                 setUser(userData)
                 setIsAuthenticated(true)
                 setStore(result.store)
-                localStorage.setItem('kadai_user_role', userData.role)
+                localStorage.setItem('kadai_user_role', (userData.role || 'owner').toLowerCase())
                 localStorage.setItem('kadai_store_name', result.store?.name || '')
 
                 return { success: true, user: userData }
