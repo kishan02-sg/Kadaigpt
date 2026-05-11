@@ -87,9 +87,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db)
-) -> User:
-    """Get current authenticated user from JWT token"""
+):
+    """Get current authenticated user from JWT token — uses raw SQL to avoid MissingGreenlet"""
     from sqlalchemy import text
+    from types import SimpleNamespace
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -103,31 +104,51 @@ async def get_current_user(
         user_id_raw = payload.get("sub")
         if user_id_raw is None:
             raise credentials_exception
-        # Handle both string and int user_id
         try:
             user_id = int(user_id_raw)
         except (ValueError, TypeError):
             raise credentials_exception
-        token_data = TokenData(user_id=user_id)
     except JWTError as e:
         logger.warning(f"JWT validation failed: {type(e).__name__}")
         raise credentials_exception
     
-    # Simple ORM query - no load_only to avoid deferred loading issues
-    result = await db.execute(select(User).where(User.id == token_data.user_id))
-    user = result.scalar_one_or_none()
+    # Raw SQL — avoids ORM lazy loading / MissingGreenlet in serverless
+    result = await db.execute(
+        text("SELECT id, email, full_name, role, phone, staff_id, is_active, store_id, password_hash FROM users WHERE id = :uid"),
+        {"uid": user_id}
+    )
+    row = result.mappings().first()
     
-    if user is None:
-        logger.warning(f"Token valid but user not found (id: {token_data.user_id})")
+    if row is None:
+        logger.warning(f"Token valid but user not found (id: {user_id})")
         raise credentials_exception
     
-    if not user.is_active:
+    if not row["is_active"]:
         raise HTTPException(status_code=400, detail="Inactive user")
     
+    # Build a lightweight User-compatible object
+    # Convert role string → UserRole enum so RBAC comparisons work
+    role_str = str(row["role"]).upper()
+    try:
+        role_enum = UserRole(role_str)
+    except (ValueError, KeyError):
+        role_enum = role_str  # fallback to string if unknown role
+    
+    user = SimpleNamespace(
+        id=row["id"],
+        email=row["email"],
+        full_name=row["full_name"],
+        role=role_enum,
+        phone=row["phone"],
+        staff_id=row.get("staff_id"),
+        is_active=row["is_active"],
+        store_id=row["store_id"],
+        password_hash=row["password_hash"],
+    )
     return user
 
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+async def get_current_active_user(current_user = Depends(get_current_user)):
     """Ensure current user is active"""
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
