@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Truck, Plus, Phone, MapPin, Package, Calendar, Clock, TrendingUp, X, Check, AlertTriangle, Search, Filter, Mail, Star, ShoppingCart, MessageCircle, Loader2, Edit2, Trash2 } from 'lucide-react'
+import { Truck, Plus, Phone, MapPin, Package, Calendar, Clock, TrendingUp, X, Check, AlertTriangle, Search, Filter, Mail, Star, ShoppingCart, MessageCircle, Loader2, Edit2, Trash2, BarChart3, ArrowDown, ArrowUp, Box } from 'lucide-react'
 import whatsappService from '../services/whatsapp'
 import api from '../services/api'
 
@@ -7,6 +7,7 @@ export default function Suppliers({ addToast }) {
     const [suppliers, setSuppliers] = useState([])
     const [orders, setOrders] = useState([])
     const [lowStockProducts, setLowStockProducts] = useState([])
+    const [allProducts, setAllProducts] = useState([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [showAddModal, setShowAddModal] = useState(false)
@@ -18,6 +19,8 @@ export default function Suppliers({ addToast }) {
     const [newSupplier, setNewSupplier] = useState({ name: '', contact: '', phone: '', email: '', address: '', category: 'General' })
     const [orderItems, setOrderItems] = useState([])
     const [supplierProducts, setSupplierProducts] = useState([{ name: '', quantity: '', price: '' }])
+    const [showStockDashboard, setShowStockDashboard] = useState(true)
+    const [stockFilter, setStockFilter] = useState('all') // all, low, out, good
 
     const storeName = localStorage.getItem('kadai_store_name') || 'KadaiGPT Store'
 
@@ -37,9 +40,10 @@ export default function Suppliers({ addToast }) {
             setSuppliers(Array.isArray(suppliersData) ? suppliersData : [])
             setOrders(Array.isArray(ordersData) ? ordersData : [])
 
-            // Get low stock products
+            // Get all products and low stock products
             const products = productsData?.products || []
-            const lowStock = products.filter(p => (p.stock || 0) <= (p.min_stock || p.minStock || 10))
+            setAllProducts(products)
+            const lowStock = products.filter(p => (p.stock || p.current_stock || 0) <= (p.min_stock || p.minStock || 10))
             setLowStockProducts(lowStock)
         } catch (error) {
             console.error('Error loading suppliers:', error)
@@ -52,6 +56,42 @@ export default function Suppliers({ addToast }) {
     const totalPending = suppliers.reduce((sum, s) => sum + (s.pending_amount || s.pendingAmount || 0), 0) || 0
     const pendingOrders = orders.filter(o => o.status === 'pending').length
     const totalSuppliers = suppliers.length
+
+    // Stock stats
+    const totalProducts = allProducts.length
+    const outOfStockCount = allProducts.filter(p => (p.stock || p.current_stock || 0) <= 0).length
+    const lowStockCount = allProducts.filter(p => {
+        const stock = p.stock || p.current_stock || 0
+        const minStock = p.min_stock || p.minStock || 10
+        return stock > 0 && stock <= minStock
+    }).length
+    const healthyStockCount = totalProducts - outOfStockCount - lowStockCount
+    const totalStockValue = allProducts.reduce((sum, p) => sum + ((p.stock || p.current_stock || 0) * (p.price || 0)), 0)
+
+    // Filtered stock products
+    const filteredStockProducts = allProducts.filter(p => {
+        const stock = p.stock || p.current_stock || 0
+        const minStock = p.min_stock || p.minStock || 10
+        if (stockFilter === 'out') return stock <= 0
+        if (stockFilter === 'low') return stock > 0 && stock <= minStock
+        if (stockFilter === 'good') return stock > minStock
+        return true
+    }).sort((a, b) => (a.stock || a.current_stock || 0) - (b.stock || b.current_stock || 0))
+
+    const getStockStatus = (product) => {
+        const stock = product.stock || product.current_stock || 0
+        const minStock = product.min_stock || product.minStock || 10
+        if (stock <= 0) return { label: 'Out of Stock', color: '#ef4444', bg: 'rgba(239,68,68,0.15)' }
+        if (stock <= minStock) return { label: 'Low Stock', color: '#f59e0b', bg: 'rgba(245,158,11,0.15)' }
+        return { label: 'In Stock', color: '#22c55e', bg: 'rgba(34,197,94,0.15)' }
+    }
+
+    const getStockBarWidth = (product) => {
+        const stock = product.stock || product.current_stock || 0
+        const minStock = product.min_stock || product.minStock || 10
+        const maxStock = minStock * 5
+        return Math.min(100, Math.max(2, (stock / maxStock) * 100))
+    }
 
     // Filter
     const filteredSuppliers = suppliers.filter(s =>
@@ -283,6 +323,104 @@ export default function Suppliers({ addToast }) {
                         <span className="label">Payables</span>
                     </div>
                 </div>
+            </div>
+
+            {/* Stock Overview Dashboard */}
+            <div className="stock-dashboard">
+                <div className="stock-dash-header">
+                    <h2 className="stock-dash-title">
+                        <BarChart3 size={22} /> Stock Overview
+                    </h2>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setShowStockDashboard(!showStockDashboard)}>
+                        {showStockDashboard ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+                        {showStockDashboard ? 'Collapse' : 'Expand'}
+                    </button>
+                </div>
+
+                {showStockDashboard && (
+                    <>
+                        {/* Stock Health Cards */}
+                        <div className="stock-health-grid">
+                            <div className="stock-health-card" onClick={() => setStockFilter('all')} style={{ cursor: 'pointer', borderColor: stockFilter === 'all' ? 'var(--primary-400)' : 'var(--border-subtle)' }}>
+                                <Box size={20} style={{ color: 'var(--primary-400)' }} />
+                                <span className="shc-value">{totalProducts}</span>
+                                <span className="shc-label">Total Products</span>
+                            </div>
+                            <div className="stock-health-card good" onClick={() => setStockFilter('good')} style={{ cursor: 'pointer', borderColor: stockFilter === 'good' ? '#22c55e' : 'var(--border-subtle)' }}>
+                                <Check size={20} style={{ color: '#22c55e' }} />
+                                <span className="shc-value" style={{ color: '#22c55e' }}>{healthyStockCount}</span>
+                                <span className="shc-label">Healthy Stock</span>
+                            </div>
+                            <div className="stock-health-card warning" onClick={() => setStockFilter('low')} style={{ cursor: 'pointer', borderColor: stockFilter === 'low' ? '#f59e0b' : 'var(--border-subtle)' }}>
+                                <AlertTriangle size={20} style={{ color: '#f59e0b' }} />
+                                <span className="shc-value" style={{ color: '#f59e0b' }}>{lowStockCount}</span>
+                                <span className="shc-label">Low Stock</span>
+                            </div>
+                            <div className="stock-health-card danger" onClick={() => setStockFilter('out')} style={{ cursor: 'pointer', borderColor: stockFilter === 'out' ? '#ef4444' : 'var(--border-subtle)' }}>
+                                <X size={20} style={{ color: '#ef4444' }} />
+                                <span className="shc-value" style={{ color: '#ef4444' }}>{outOfStockCount}</span>
+                                <span className="shc-label">Out of Stock</span>
+                            </div>
+                            <div className="stock-health-card" style={{ borderColor: 'var(--border-subtle)' }}>
+                                <TrendingUp size={20} style={{ color: 'var(--primary-400)' }} />
+                                <span className="shc-value">₹{totalStockValue.toLocaleString('en-IN')}</span>
+                                <span className="shc-label">Stock Value</span>
+                            </div>
+                        </div>
+
+                        {/* Stock Table */}
+                        {filteredStockProducts.length > 0 ? (
+                            <div className="stock-table-wrap">
+                                <div className="stock-table-header">
+                                    <span className="st-col-name">Product</span>
+                                    <span className="st-col-stock">Current Stock</span>
+                                    <span className="st-col-bar">Level</span>
+                                    <span className="st-col-status">Status</span>
+                                    <span className="st-col-price">Price</span>
+                                </div>
+                                {filteredStockProducts.slice(0, 20).map(product => {
+                                    const status = getStockStatus(product)
+                                    const barWidth = getStockBarWidth(product)
+                                    const stock = product.stock || product.current_stock || 0
+                                    const minStock = product.min_stock || product.minStock || 10
+                                    return (
+                                        <div key={product.id} className="stock-table-row">
+                                            <span className="st-col-name">
+                                                <strong>{product.name}</strong>
+                                                <small>{product.category || 'General'}</small>
+                                            </span>
+                                            <span className="st-col-stock">
+                                                <strong>{stock}</strong>
+                                                <small>min: {minStock}</small>
+                                            </span>
+                                            <span className="st-col-bar">
+                                                <div className="stock-bar-bg">
+                                                    <div className="stock-bar-fill" style={{ width: `${barWidth}%`, background: status.color }} />
+                                                </div>
+                                            </span>
+                                            <span className="st-col-status">
+                                                <span className="stock-status-badge" style={{ color: status.color, background: status.bg }}>
+                                                    {status.label}
+                                                </span>
+                                            </span>
+                                            <span className="st-col-price">₹{(product.price || 0).toLocaleString()}</span>
+                                        </div>
+                                    )
+                                })}
+                                {filteredStockProducts.length > 20 && (
+                                    <div style={{ textAlign: 'center', padding: '12px', color: 'var(--text-tertiary)', fontSize: '0.8125rem' }}>
+                                        Showing 20 of {filteredStockProducts.length} products
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-tertiary)' }}>
+                                <Package size={40} style={{ opacity: 0.3, marginBottom: 8 }} />
+                                <p>No products found{stockFilter !== 'all' ? ` with "${stockFilter}" filter` : ''}</p>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
 
             {/* Low Stock Alert */}
@@ -695,6 +833,80 @@ export default function Suppliers({ addToast }) {
 
             <style>{`
         .header-actions { display: flex; gap: 12px; }
+
+        /* ─── Stock Dashboard ─── */
+        .stock-dashboard {
+          background: var(--bg-card); border: 1px solid var(--border-subtle);
+          border-radius: var(--radius-xl); padding: 20px; margin-bottom: 20px;
+        }
+        .stock-dash-header {
+          display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;
+        }
+        .stock-dash-title {
+          display: flex; align-items: center; gap: 10px;
+          font-size: 1.125rem; font-weight: 700; margin: 0;
+        }
+        .stock-dash-title svg { color: var(--primary-400); }
+
+        .stock-health-grid {
+          display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px;
+        }
+        @media (max-width: 1024px) { .stock-health-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 640px) { .stock-health-grid { grid-template-columns: repeat(2, 1fr); } }
+        .stock-health-card {
+          display: flex; flex-direction: column; align-items: center; gap: 6px;
+          padding: 16px 12px; background: var(--bg-tertiary);
+          border: 2px solid var(--border-subtle); border-radius: var(--radius-lg);
+          transition: all 0.2s ease;
+        }
+        .stock-health-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .shc-value { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+        .shc-label { font-size: 0.75rem; color: var(--text-tertiary); text-align: center; }
+
+        .stock-table-wrap {
+          border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+          overflow: hidden;
+        }
+        .stock-table-header {
+          display: grid; grid-template-columns: 2fr 1fr 1.5fr 1fr 0.8fr;
+          gap: 12px; padding: 10px 16px;
+          background: var(--bg-tertiary); font-size: 0.75rem; font-weight: 600;
+          color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .stock-table-row {
+          display: grid; grid-template-columns: 2fr 1fr 1.5fr 1fr 0.8fr;
+          gap: 12px; padding: 12px 16px; align-items: center;
+          border-top: 1px solid var(--border-subtle);
+          transition: background 0.15s ease;
+        }
+        .stock-table-row:hover { background: var(--bg-tertiary); }
+        .st-col-name { display: flex; flex-direction: column; gap: 2px; }
+        .st-col-name strong { font-size: 0.875rem; }
+        .st-col-name small { font-size: 0.7rem; color: var(--text-tertiary); }
+        .st-col-stock { display: flex; flex-direction: column; gap: 2px; text-align: center; }
+        .st-col-stock strong { font-size: 1rem; }
+        .st-col-stock small { font-size: 0.7rem; color: var(--text-tertiary); }
+        .st-col-bar { display: flex; align-items: center; }
+        .stock-bar-bg {
+          width: 100%; height: 8px; background: var(--bg-tertiary);
+          border-radius: 4px; overflow: hidden;
+        }
+        .stock-bar-fill {
+          height: 100%; border-radius: 4px;
+          transition: width 0.5s ease;
+        }
+        .st-col-status { display: flex; justify-content: center; }
+        .stock-status-badge {
+          padding: 3px 10px; border-radius: 20px;
+          font-size: 0.7rem; font-weight: 600; white-space: nowrap;
+        }
+        .st-col-price { text-align: right; font-weight: 600; font-size: 0.875rem; }
+        @media (max-width: 768px) {
+          .stock-table-header, .stock-table-row { grid-template-columns: 2fr 1fr 1.5fr; }
+          .st-col-status, .st-col-price { display: none; }
+        }
+        
+        /* ─── Supplier Stats ─── */
         
         .supplier-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
         @media (max-width: 1024px) { .supplier-stats { grid-template-columns: repeat(2, 1fr); } }
