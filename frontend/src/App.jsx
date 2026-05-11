@@ -232,7 +232,7 @@ function App() {
                       'expenses', 'staff', 'whatsapp', 'loyalty', 'ai-insights',
                       'bulk-operations', 'settings', 'privacy', 'terms'],
             cashier: ['create-bill', 'bills', 'products', 'customers', 'ocr', 'settings', 'privacy', 'terms'],
-            inventory_manager: ['products', 'suppliers', 'bulk-operations', 'settings', 'privacy', 'terms'],
+            inventory_manager: ['dashboard', 'products', 'suppliers', 'bulk-operations', 'analytics', 'settings', 'privacy', 'terms'],
         }
 
         const role = (userRole || 'owner').toLowerCase()
