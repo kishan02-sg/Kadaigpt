@@ -1644,17 +1644,21 @@ export default function CreateBill({ addToast, setCurrentPage }) {
         .receipt-preview { background: #1a1a1a; padding: 20px; border-radius: var(--radius-lg); overflow-x: auto; }
         .receipt-preview pre { font-family: 'Courier New', monospace; font-size: 0.75rem; color: #e5e5e5; white-space: pre; margin: 0; }
         
-        .payment-modal { max-width: 420px; }
-        .bill-success { text-align: center; padding: 20px 0; }
-        .success-icon { width: 56px; height: 56px; background: var(--success); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; margin: 0 auto 12px; }
-        .bill-number { color: var(--text-secondary); font-family: var(--font-mono); font-size: 1.1rem; }
-        .bill-amount { font-size: 2rem; font-weight: 700; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 6px; }
+        .payment-modal { max-width: 460px; width: 90vw; }
+        .bill-success { text-align: center; padding: 24px 0 16px; }
+        .success-icon { width: 60px; height: 60px; background: var(--success); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; margin: 0 auto 14px; box-shadow: 0 4px 16px rgba(34,197,94,0.3); }
+        .bill-success h4 { margin: 0 0 4px; font-size: 1.1rem; }
+        .bill-number { color: var(--text-secondary); font-family: var(--font-mono); font-size: 0.95rem; margin: 0; }
+        .bill-amount { font-size: 2rem; font-weight: 700; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: 8px; }
         
         .payment-options { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-subtle); }
-        .payment-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
-        .payment-btn { padding: 10px 8px; background: var(--bg-tertiary); border: 2px solid transparent; border-radius: var(--radius-md); font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--text-primary); font-size: 0.8rem; }
-        .payment-btn:hover { border-color: var(--border-default); }
-        .payment-btn.active { border-color: var(--primary-400); background: rgba(249, 115, 22, 0.1); color: var(--primary-400); }
+        .payment-options .form-label { text-align: center; display: block; margin-bottom: 10px; }
+        .payment-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+        .payment-btn { padding: 12px 10px; background: var(--bg-tertiary); border: 2px solid var(--border-subtle); border-radius: var(--radius-lg); font-weight: 600; cursor: pointer; transition: all 0.2s; color: var(--text-primary); font-size: 0.85rem; text-align: center; }
+        .payment-btn:hover { border-color: var(--primary-400); background: rgba(249, 115, 22, 0.05); }
+        .payment-btn.active { border-color: var(--primary-400); background: rgba(249, 115, 22, 0.15); color: var(--primary-400); font-weight: 700; }
+        .payment-modal .modal-footer { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding: 16px 20px; }
+        .payment-modal .modal-footer .btn { flex: 1; min-width: 100px; justify-content: center; font-size: 0.8rem; padding: 10px 14px; }
         
         /* Legacy styles kept for compatibility */
         .new-customer-badge { background: rgba(34, 197, 94, 0.1); border: 1px dashed var(--success); border-radius: var(--radius-sm); padding: 8px; font-size: 0.75rem; color: var(--success); text-align: center; }
