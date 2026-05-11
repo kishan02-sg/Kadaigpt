@@ -37,8 +37,8 @@ async def export_user_data(
         "email": current_user.email,
         "full_name": current_user.full_name,
         "phone": current_user.phone,
-        "role": current_user.role.value if current_user.role else None,
-        "created_at": str(current_user.created_at) if current_user.created_at else None,
+        "role": str(current_user.role.value) if hasattr(current_user.role, 'value') else str(current_user.role),
+        "created_at": str(getattr(current_user, 'created_at', None)),
     }
 
     # 2. Store info
@@ -163,12 +163,11 @@ async def delete_account(
     logger.warning(f"Account deletion requested for user {user_id}, store {store_id}")
 
     try:
-        # Anonymize user PII (keep record for audit trail)
-        current_user.email = f"deleted_{user_id}@anon.kadaigpt.com"
-        current_user.phone = None
-        current_user.full_name = "Deleted User"
-        current_user.is_active = False
-
+        # Anonymize user PII via raw SQL (SimpleNamespace is not an ORM object)
+        await db.execute(
+            text("UPDATE users SET email = :email, phone = NULL, full_name = 'Deleted User', is_active = false WHERE id = :uid"),
+            {"email": f"deleted_{user_id}@anon.kadaigpt.com", "uid": user_id}
+        )
         await db.commit()
 
         logger.info(f"Account {user_id} anonymized successfully")
@@ -204,6 +203,6 @@ async def get_consent_status(
             "marketing_email": False,
             "ai_training": True,
         },
-        "last_updated": str(current_user.updated_at or current_user.created_at),
+        "last_updated": str(getattr(current_user, 'updated_at', None) or getattr(current_user, 'created_at', None)),
         "note": "To change consent settings, contact privacy@kadaigpt.com",
     }

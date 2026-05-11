@@ -82,15 +82,17 @@ const CASHIER = {
 // ─────────────────────────────────────────────────────
 const INVENTORY_MANAGER = {
     label: 'Inventory',
-    defaultPage: 'products',
+    defaultPage: 'dashboard',
     nav: [
+        { id: 'dashboard',       label: 'Dashboard',    icon: Home },
         { id: 'products',        label: 'Products',     icon: Package },
-        { id: 'suppliers',       label: 'Suppliers',    icon: Users },
+        { id: 'suppliers',       label: 'Suppliers',    icon: Truck },
         { id: 'bulk-operations', label: 'Import/Export', icon: FileText },
         { id: 'analytics',       label: 'Analytics',    icon: BarChart3 },
+    ],
+    moreNav: [
         { id: 'settings',        label: 'Settings',     icon: SettingsIcon },
     ],
-    moreNav: [],
 }
 
 // ─────────────────────────────────────────────────────
