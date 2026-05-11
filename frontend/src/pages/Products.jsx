@@ -472,7 +472,97 @@ export default function Products({ addToast, setCurrentPage }) {
                 </div>
             )}
 
-            {/* Stock Adjustment Modal */}
+            {/* Edit Product Modal */}
+            {editProduct && (
+                <div className="modal-overlay" onClick={() => setEditProduct(null)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3 className="modal-title">✏️ Edit Product</h3>
+                            <button className="modal-close" onClick={() => setEditProduct(null)}><X size={20} /></button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label className="form-label">Product Name *</label>
+                                    <input type="text" className="form-input"
+                                        value={editProduct.name}
+                                        onChange={(e) => setEditProduct({ ...editProduct, name: e.target.value })} />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">SKU</label>
+                                    <input type="text" className="form-input"
+                                        value={editProduct.sku || ''}
+                                        onChange={(e) => setEditProduct({ ...editProduct, sku: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label className="form-label">Price (₹) *</label>
+                                    <input type="number" className="form-input"
+                                        value={editProduct.price || editProduct.selling_price || ''}
+                                        onChange={(e) => setEditProduct({ ...editProduct, price: parseFloat(e.target.value) || 0 })} />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Unit</label>
+                                    <select className="form-input" value={editProduct.unit || 'kg'} onChange={(e) => setEditProduct({ ...editProduct, unit: e.target.value })}>
+                                        <option value="kg">kg</option>
+                                        <option value="g">g</option>
+                                        <option value="L">L</option>
+                                        <option value="ml">ml</option>
+                                        <option value="pcs">pcs</option>
+                                        <option value="pack">pack</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="form-row">
+                                <div className="form-group">
+                                    <label className="form-label">Current Stock *</label>
+                                    <input type="number" className="form-input"
+                                        value={editProduct.stock ?? editProduct.current_stock ?? ''}
+                                        onChange={(e) => setEditProduct({ ...editProduct, stock: parseInt(e.target.value) || 0 })} />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Minimum Stock</label>
+                                    <input type="number" className="form-input"
+                                        value={editProduct.minStock ?? editProduct.min_stock_alert ?? 10}
+                                        onChange={(e) => setEditProduct({ ...editProduct, minStock: parseInt(e.target.value) || 10 })} />
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Category</label>
+                                <select className="form-input" value={editProduct.category || 'General'} onChange={(e) => setEditProduct({ ...editProduct, category: e.target.value })}>
+                                    {categories.filter(c => c !== 'All').map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button className="btn btn-secondary" onClick={() => setEditProduct(null)}>Cancel</button>
+                            <button className="btn btn-primary" onClick={async () => {
+                                try {
+                                    await api.updateProduct(editProduct.id, {
+                                        name: editProduct.name,
+                                        sku: editProduct.sku,
+                                        selling_price: parseFloat(editProduct.price || editProduct.selling_price),
+                                        current_stock: parseInt(editProduct.stock ?? editProduct.current_stock),
+                                        min_stock_alert: parseInt(editProduct.minStock ?? editProduct.min_stock_alert ?? 10),
+                                        unit: editProduct.unit,
+                                        category: editProduct.category,
+                                    })
+                                    addToast('✅ Product updated!', 'success')
+                                    setEditProduct(null)
+                                    loadProducts()
+                                } catch (error) {
+                                    addToast(error.message || 'Failed to update product', 'error')
+                                }
+                            }} disabled={!editProduct.name}>
+                                <Save size={18} /> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {stockAdjust && (
                 <div className="modal-overlay" onClick={() => setStockAdjust(null)}>
                     <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
