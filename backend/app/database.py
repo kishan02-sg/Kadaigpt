@@ -22,6 +22,25 @@ db_url = settings.get_async_database_url()
 is_sqlite = db_url.startswith("sqlite")
 is_serverless = settings.is_serverless
 
+# Resolve database hostname to IPv4 address to prevent "[Errno 99] Cannot assign requested address" on Vercel
+if not is_sqlite and is_serverless:
+    try:
+        import socket
+        from urllib.parse import urlparse, urlunparse
+        parsed = urlparse(db_url)
+        if parsed.hostname and not parsed.hostname.replace('.', '').isdigit():
+            port = parsed.port or 5432
+            addrinfo = socket.getaddrinfo(parsed.hostname, port, family=socket.AF_INET, proto=socket.IPPROTO_TCP)
+            if addrinfo:
+                ipv4_ip = addrinfo[0][4][0]
+                netloc = f"{parsed.username}:{parsed.password}@{ipv4_ip}:{port}"
+                parsed = parsed._replace(netloc=netloc)
+                db_url = urlunparse(parsed)
+                logger.info(f"[Database] Resolved hostname to IPv4 address: {ipv4_ip}")
+    except Exception as e:
+        logger.warning(f"[Database] Failed to resolve hostname to IPv4 address: {e}")
+
+
 # asyncpg does NOT support 'sslmode' as a URL parameter (that's psycopg2-only)
 # Strip it from the URL and handle SSL via connect_args instead
 _needs_ssl = False
