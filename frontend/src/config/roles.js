@@ -4,6 +4,9 @@
  *
  * Owner: full nav + "More" dropdown for all extra pages
  * Staff:  exactly 5 nav items, no dropdown
+ *
+ * Labels use i18n translation keys (e.g. 'nav.dashboard') so they
+ * automatically switch when the user changes language.
  */
 
 import {
@@ -19,23 +22,23 @@ const OWNER = {
     label: 'Owner',
     defaultPage: 'dashboard',
     nav: [
-        { id: 'dashboard',   label: 'Dashboard', icon: Home },
-        { id: 'create-bill', label: 'New Bill',  icon: Plus, primary: true },
-        { id: 'staff',       label: 'Staff',     icon: Users },
-        { id: 'bills',       label: 'Bills',     icon: FileText },
-        { id: 'products',    label: 'Products',  icon: Package },
-        { id: 'customers',   label: 'Customers', icon: Users },
+        { id: 'dashboard',   labelKey: 'nav.dashboard',  label: 'Dashboard', icon: Home },
+        { id: 'create-bill', labelKey: 'nav.newBill',    label: 'New Bill',  icon: Plus, primary: true },
+        { id: 'staff',       labelKey: 'nav.staff',      label: 'Staff',     icon: Users },
+        { id: 'bills',       labelKey: 'nav.bills',      label: 'Bills',     icon: FileText },
+        { id: 'products',    labelKey: 'nav.products',   label: 'Products',  icon: Package },
+        { id: 'customers',   labelKey: 'nav.customers',  label: 'Customers', icon: Users },
     ],
     moreNav: [
-        { id: 'analytics',       label: 'Analytics',      icon: BarChart3 },
-        { id: 'loyalty',         label: 'Loyalty',         icon: Gift },
-        { id: 'suppliers',       label: 'Suppliers',       icon: Truck },
-        { id: 'expenses',        label: 'Expenses',        icon: Wallet },
-        { id: 'daily-summary',   label: 'Daily Summary',   icon: CalendarCheck },
-        { id: 'ai-insights',     label: 'AI Insights',     icon: Brain },
-        { id: 'gst',             label: 'GST Reports',     icon: Receipt },
-        { id: 'bulk-operations', label: 'Import/Export',    icon: Upload },
-        { id: 'settings',        label: 'Settings',        icon: SettingsIcon },
+        { id: 'analytics',       labelKey: 'nav.analytics',       label: 'Analytics',      icon: BarChart3 },
+        { id: 'loyalty',         labelKey: 'nav.loyalty',         label: 'Loyalty',         icon: Gift },
+        { id: 'suppliers',       labelKey: 'nav.suppliers',       label: 'Suppliers',       icon: Truck },
+        { id: 'expenses',        labelKey: 'nav.expenses',        label: 'Expenses',        icon: Wallet },
+        { id: 'daily-summary',   labelKey: 'nav.dailySummary',   label: 'Daily Summary',   icon: CalendarCheck },
+        { id: 'ai-insights',     labelKey: 'nav.aiInsights',     label: 'AI Insights',     icon: Brain },
+        { id: 'gst',             labelKey: 'nav.gst',             label: 'GST Reports',     icon: Receipt },
+        { id: 'bulk-operations', labelKey: 'nav.bulkOperations', label: 'Import/Export',    icon: Upload },
+        { id: 'settings',        labelKey: 'nav.settings',       label: 'Settings',        icon: SettingsIcon },
     ],
 }
 
@@ -46,18 +49,18 @@ const MANAGER = {
     label: 'Manager',
     defaultPage: 'dashboard',
     nav: [
-        { id: 'dashboard',   label: 'Dashboard', icon: Home },
-        { id: 'create-bill', label: 'New Bill',  icon: Plus, primary: true },
-        { id: 'bills',       label: 'Bills',     icon: FileText },
-        { id: 'products',    label: 'Products',  icon: Package },
-        { id: 'customers',   label: 'Customers', icon: Users },
-        { id: 'staff',       label: 'Staff',     icon: Users },
+        { id: 'dashboard',   labelKey: 'nav.dashboard',  label: 'Dashboard', icon: Home },
+        { id: 'create-bill', labelKey: 'nav.newBill',    label: 'New Bill',  icon: Plus, primary: true },
+        { id: 'bills',       labelKey: 'nav.bills',      label: 'Bills',     icon: FileText },
+        { id: 'products',    labelKey: 'nav.products',   label: 'Products',  icon: Package },
+        { id: 'customers',   labelKey: 'nav.customers',  label: 'Customers', icon: Users },
+        { id: 'staff',       labelKey: 'nav.staff',      label: 'Staff',     icon: Users },
     ],
     moreNav: [
-        { id: 'analytics',   label: 'Analytics',  icon: BarChart3 },
-        { id: 'suppliers',   label: 'Suppliers',  icon: Truck },
-        { id: 'expenses',    label: 'Expenses',   icon: Wallet },
-        { id: 'settings',    label: 'Settings',   icon: SettingsIcon },
+        { id: 'analytics',   labelKey: 'nav.analytics',  label: 'Analytics',  icon: BarChart3 },
+        { id: 'suppliers',   labelKey: 'nav.suppliers',   label: 'Suppliers',  icon: Truck },
+        { id: 'expenses',    labelKey: 'nav.expenses',    label: 'Expenses',   icon: Wallet },
+        { id: 'settings',    labelKey: 'nav.settings',    label: 'Settings',   icon: SettingsIcon },
     ],
 }
 
@@ -68,11 +71,11 @@ const CASHIER = {
     label: 'Cashier',
     defaultPage: 'create-bill',
     nav: [
-        { id: 'create-bill', label: 'New Bill',   icon: Plus, primary: true },
-        { id: 'bills',       label: 'Bills',      icon: FileText },
-        { id: 'products',    label: 'Products',   icon: Package },
-        { id: 'customers',   label: 'Customers',  icon: Users },
-        { id: 'loyalty',     label: 'Loyalty',    icon: Star },
+        { id: 'create-bill', labelKey: 'nav.newBill',    label: 'New Bill',   icon: Plus, primary: true },
+        { id: 'bills',       labelKey: 'nav.bills',      label: 'Bills',      icon: FileText },
+        { id: 'products',    labelKey: 'nav.products',   label: 'Products',   icon: Package },
+        { id: 'customers',   labelKey: 'nav.customers',  label: 'Customers',  icon: Users },
+        { id: 'loyalty',     labelKey: 'nav.loyalty',    label: 'Loyalty',    icon: Star },
     ],
     moreNav: [],
 }
@@ -84,14 +87,14 @@ const INVENTORY_MANAGER = {
     label: 'Inventory',
     defaultPage: 'dashboard',
     nav: [
-        { id: 'dashboard',       label: 'Dashboard',    icon: Home },
-        { id: 'products',        label: 'Products',     icon: Package },
-        { id: 'suppliers',       label: 'Suppliers',    icon: Truck },
-        { id: 'bulk-operations', label: 'Import/Export', icon: FileText },
-        { id: 'analytics',       label: 'Analytics',    icon: BarChart3 },
+        { id: 'dashboard',       labelKey: 'nav.dashboard',       label: 'Dashboard',    icon: Home },
+        { id: 'products',        labelKey: 'nav.products',        label: 'Products',     icon: Package },
+        { id: 'suppliers',       labelKey: 'nav.suppliers',       label: 'Suppliers',    icon: Truck },
+        { id: 'bulk-operations', labelKey: 'nav.bulkOperations',  label: 'Import/Export', icon: FileText },
+        { id: 'analytics',       labelKey: 'nav.analytics',       label: 'Analytics',    icon: BarChart3 },
     ],
     moreNav: [
-        { id: 'settings',        label: 'Settings',     icon: SettingsIcon },
+        { id: 'settings',        labelKey: 'nav.settings',        label: 'Settings',     icon: SettingsIcon },
     ],
 }
 

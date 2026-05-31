@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ShoppingCart, Settings as SettingsIcon, Command, LogOut, Menu, X, Bell, User, ChevronDown } from 'lucide-react'
 import MobileNav from './components/MobileNav'
 import OnboardingWizard from './components/OnboardingWizard'
@@ -54,6 +55,7 @@ errorTracker.init()
 import { getRoleConfig, getRoleDefaultPage, VALID_PAGES } from './config/roles'
 
 function App() {
+    const { t } = useTranslation()
     const getInitialPage = () => {
         const hash = window.location.hash.replace('#', '')
         const savedRole = localStorage.getItem('kadai_user_role') || 'owner'
@@ -348,7 +350,7 @@ function App() {
                                 aria-current={currentPage === item.id ? 'page' : undefined}
                             >
                                 <item.icon size={18} />
-                                <span>{item.label}</span>
+                                <span>{t(item.labelKey, item.label)}</span>
                             </button>
                         ))}
 
@@ -366,7 +368,7 @@ function App() {
                                         onClick={() => setCurrentPage(item.id)}
                                     >
                                         <item.icon size={16} />
-                                        {item.label}
+                                        {t(item.labelKey, item.label)}
                                     </button>
                                 ))}
                             </div>
@@ -379,7 +381,7 @@ function App() {
                     {/* Online Status */}
                     <div className={`status-indicator ${isOnline ? 'online' : 'offline'}`}>
                         <span className="status-dot"></span>
-                        <span className="status-text">{isOnline ? 'Online' : 'Offline'}</span>
+                        <span className="status-text">{isOnline ? t('app.online', 'Online') : t('app.offline', 'Offline')}</span>
                     </div>
 
                     {/* Language Switcher */}
@@ -404,9 +406,9 @@ function App() {
                         {showNotifications && (
                             <div className="notification-dropdown">
                                 <div className="notification-header">
-                                    <span>Notifications</span>
+                                    <span>{t('notifications.title', 'Notifications')}</span>
                                     <button onClick={() => setNotifications(notifications.map(n => ({ ...n, read: true })))}>
-                                        Mark all read
+                                        {t('notifications.markAllRead', 'Mark all read')}
                                     </button>
                                 </div>
                                 <div className="notification-list">
