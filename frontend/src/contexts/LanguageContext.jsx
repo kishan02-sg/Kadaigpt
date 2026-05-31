@@ -221,6 +221,177 @@ export const commonTranslations = {
         ltr: "லிட்டர்",
         pcs: "துண்டு",
         dozen: "டஜன்"
+    },
+    te: {
+        // Navigation
+        dashboard: "డాష్‌బోర్డ్",
+        billing: "బిల్లింగ్",
+        products: "ఉత్పత్తులు",
+        customers: "కస్టమర్లు",
+        analytics: "విశ్లేషణ",
+        settings: "సెట్టింగ్‌లు",
+
+        // Common Actions
+        save: "సేవ్ చేయండి",
+        cancel: "రద్దు చేయండి",
+        delete: "తొలగించు",
+        edit: "సవరించు",
+        add: "జోడించు",
+        update: "అప్‌డేట్ చేయండి",
+        search: "వెతకండి",
+        filter: "ఫిల్టర్",
+        export: "ఎగుమతి",
+        import: "దిగుమతి",
+        refresh: "రిఫ్రెష్",
+        submit: "సమర్పించు",
+        close: "మూసివేయి",
+
+        // Common Labels
+        name: "పేరు",
+        price: "ధర",
+        quantity: "పరిమాణం",
+        total: "మొత్తం",
+        date: "తేదీ",
+        time: "సమయం",
+        status: "స్థితి",
+        actions: "చర్యలు",
+        category: "వర్గం",
+        description: "వివరణ",
+
+        // Messages
+        success: "విజయం!",
+        error: "లోపం!",
+        warning: "హెచ్చరిక!",
+        info: "సమాచారం",
+        loading: "లోడ్ అవుతోంది...",
+        noData: "డేటా అందుబాటులో లేదు",
+        confirmDelete: "మీరు ఖచ్చితంగా తొలగించాలనుకుంటున్నారా?",
+
+        // AI Agent
+        aiAssistant: "AI సహాయకుడు",
+        askAnything: "ఏదైనా అడగండి...",
+        voiceCommand: "వాయిస్ కమాండ్",
+        processing: "ప్రాసెస్ అవుతోంది...",
+
+        // Common Units
+        kg: "కిలో",
+        ltr: "లీటర్",
+        pcs: "ముక్కలు",
+        dozen: "డజన్"
+    },
+    kn: {
+        // Navigation
+        dashboard: "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+        billing: "ಬಿಲ್ಲಿಂಗ್",
+        products: "ಉತ್ಪನ್ನಗಳು",
+        customers: "ಗ್ರಾಹಕರು",
+        analytics: "ವಿಶ್ಲೇಷಣೆ",
+        settings: "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+
+        // Common Actions
+        save: "ಉಳಿಸಿ",
+        cancel: "ರದ್ದುಮಾಡಿ",
+        delete: "ಅಳಿಸಿ",
+        edit: "ಸಂಪಾದಿಸಿ",
+        add: "ಸೇರಿಸಿ",
+        update: "ಅಪ್‌ಡೇಟ್ ಮಾಡಿ",
+        search: "ಹುಡುಕಿ",
+        filter: "ಫಿಲ್ಟರ್",
+        export: "ರಫ್ತು",
+        import: "ಆಮದು",
+        refresh: "ರಿಫ್ರೆಶ್",
+        submit: "ಸಲ್ಲಿಸಿ",
+        close: "ಮುಚ್ಚಿ",
+
+        // Common Labels
+        name: "ಹೆಸರು",
+        price: "ಬೆಲೆ",
+        quantity: "ಪ್ರಮಾಣ",
+        total: "ಒಟ್ಟು",
+        date: "ದಿನಾಂಕ",
+        time: "ಸಮಯ",
+        status: "ಸ್ಥಿತಿ",
+        actions: "ಕ್ರಿಯೆಗಳು",
+        category: "ವರ್ಗ",
+        description: "ವಿವರಣೆ",
+
+        // Messages
+        success: "ಯಶಸ್ಸು!",
+        error: "ದೋಷ!",
+        warning: "ಎಚ್ಚರಿಕೆ!",
+        info: "ಮಾಹಿತಿ",
+        loading: "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+        noData: "ಡೇಟಾ ಲಭ್ಯವಿಲ್ಲ",
+        confirmDelete: "ನೀವು ಖಚಿತವಾಗಿ ಅಳಿಸಲು ಬಯಸುತ್ತೀರಾ?",
+
+        // AI Agent
+        aiAssistant: "AI ಸಹಾಯಕ",
+        askAnything: "ಏನಾದರೂ ಕೇಳಿ...",
+        voiceCommand: "ಧ್ವನಿ ಆಜ್ಞೆ",
+        processing: "ಪ್ರಕ್ರಿಯೆ ನಡೆಯುತ್ತಿದೆ...",
+
+        // Common Units
+        kg: "ಕೆಜಿ",
+        ltr: "ಲೀಟರ್",
+        pcs: "ತುಂಡುಗಳು",
+        dozen: "ಡಜನ್"
+    },
+    ml: {
+        // Navigation
+        dashboard: "ഡാഷ്‌ബോർഡ്",
+        billing: "ബില്ലിംഗ്",
+        products: "ഉൽപ്പന്നങ്ങൾ",
+        customers: "ഉപഭോക്താക്കൾ",
+        analytics: "അനലിറ്റിക്സ്",
+        settings: "സെറ്റിംഗ്സ്",
+
+        // Common Actions
+        save: "സേവ് ചെയ്യുക",
+        cancel: "റദ്ദാക്കുക",
+        delete: "ഇല്ലാതാക്കുക",
+        edit: "എഡിറ്റ് ചെയ്യുക",
+        add: "ചേർക്കുക",
+        update: "അപ്ഡേറ്റ് ചെയ്യുക",
+        search: "തിരയുക",
+        filter: "ഫിൽട്ടർ",
+        export: "എക്സ്പോർട്ട്",
+        import: "ഇംപോർട്ട്",
+        refresh: "റിഫ്രഷ്",
+        submit: "സമർപ്പിക്കുക",
+        close: "അടയ്ക്കുക",
+
+        // Common Labels
+        name: "പേര്",
+        price: "വില",
+        quantity: "അളവ്",
+        total: "ആകെ",
+        date: "തീയതി",
+        time: "സമയം",
+        status: "നില",
+        actions: "പ്രവർത്തനങ്ങൾ",
+        category: "വിഭാഗം",
+        description: "വിവരണം",
+
+        // Messages
+        success: "വിജയം!",
+        error: "പിശക്!",
+        warning: "മുന്നറിയിപ്പ്!",
+        info: "വിവരം",
+        loading: "ലോഡ് ചെയ്യുന്നു...",
+        noData: "ഡാറ്റ ലഭ്യമല്ല",
+        confirmDelete: "ഇല്ലാതാക്കണമെന്ന് ഉറപ്പാണോ?",
+
+        // AI Agent
+        aiAssistant: "AI സഹായി",
+        askAnything: "എന്തും ചോദിക്കൂ...",
+        voiceCommand: "വോയ്സ് കമാൻഡ്",
+        processing: "പ്രോസസ്സ് ചെയ്യുന്നു...",
+
+        // Common Units
+        kg: "കിലോ",
+        ltr: "ലിറ്റർ",
+        pcs: "എണ്ണം",
+        dozen: "ഡസൻ"
     }
 }
 
@@ -348,7 +519,7 @@ export function LanguageSelector({ compact = false }) {
                             zIndex: 100
                         }}
                     >
-                        {availableLanguages.slice(0, 3).map(lang => (
+                        {availableLanguages.map(lang => (
                             <button
                                 key={lang.code}
                                 onClick={() => {
