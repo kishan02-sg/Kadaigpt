@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ShieldCheck, Mail, Lock, ArrowRight, Loader2, AlertTriangle, Eye, EyeOff } from 'lucide-react'
 import api from '../services/api'
 
 export default function AdminLogin({ onLogin }) {
+  const { t } = useTranslation()
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [showPassword, setShowPassword] = useState(false)

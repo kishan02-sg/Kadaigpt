@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Shield, FileText, ChevronDown, ChevronUp, Mail, ArrowLeft } from 'lucide-react'
 
 /**
@@ -6,6 +7,7 @@ import { Shield, FileText, ChevronDown, ChevronUp, Mail, ArrowLeft } from 'lucid
  * Required for DPDP Act 2023 compliance and App Store approval
  */
 export default function LegalPages({ page = 'privacy', onBack }) {
+  const { t } = useTranslation()
     const [expandedSection, setExpandedSection] = useState(null)
 
     const toggle = (id) => setExpandedSection(expandedSection === id ? null : id)

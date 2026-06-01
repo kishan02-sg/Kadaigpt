@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShoppingCart, Settings as SettingsIcon, Command, LogOut, Menu, X, Bell, User, ChevronDown } from 'lucide-react'
+import { ShoppingCart, Settings as SettingsIcon, Command, LogOut, Menu, X, Bell, User, ChevronDown, Sun, Moon } from 'lucide-react'
 import MobileNav from './components/MobileNav'
 import OnboardingWizard from './components/OnboardingWizard'
 import CommandPalette from './components/CommandPalette'
@@ -43,6 +43,7 @@ import api from './services/api'
 import { warmup } from './services/warmup'
 import { demoProducts } from './services/demoData'
 import offlineSync from './services/offlineSync'
+import { useTheme } from './contexts/ThemeContext'
 import './i18n'
 import './App.css'
 import './styles/mobile.css'
@@ -56,6 +57,7 @@ import { getRoleConfig, getRoleDefaultPage, VALID_PAGES } from './config/roles'
 
 function App() {
     const { t } = useTranslation()
+    const { theme, toggleTheme } = useTheme()
     const getInitialPage = () => {
         const hash = window.location.hash.replace('#', '')
         const savedRole = localStorage.getItem('kadai_user_role') || 'owner'
@@ -386,6 +388,11 @@ function App() {
 
                     {/* Language Switcher */}
                     <LanguageSwitcher compact />
+
+                    {/* Theme Toggle */}
+                    <button className="icon-btn theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                    </button>
 
                     {/* Command Palette Trigger */}
                     <button className="icon-btn" onClick={() => setShowCommandPalette(true)} title="Quick Actions (Ctrl+K)">

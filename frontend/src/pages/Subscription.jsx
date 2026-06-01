@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Check, X, Crown, Zap, Star, Building2 } from 'lucide-react'
 
 export default function Subscription({ addToast }) {
+  const { t } = useTranslation()
     const [currentPlan, setCurrentPlan] = useState(localStorage.getItem('kadai_plan') || 'free')
     const [billingCycle, setBillingCycle] = useState('monthly')
 

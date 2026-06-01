@@ -196,6 +196,16 @@
   color: white;
 }
 
+.icon-btn.theme-toggle {
+  transition: all 0.3s ease;
+}
+
+.icon-btn.theme-toggle:hover {
+  background: linear-gradient(135deg, #f59e0b, #ea580c);
+  color: white;
+  transform: rotate(30deg);
+}
+
 /* User Menu */
 .user-menu-wrapper {
   position: relative;

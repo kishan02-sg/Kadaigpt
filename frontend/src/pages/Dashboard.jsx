@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { TrendingUp, ShoppingBag, Users, AlertTriangle, IndianRupee, FileText, Package, Plus, RefreshCw, ArrowUpRight, UserPlus, Settings, Store, ChevronRight } from 'lucide-react'
 import realDataService from '../services/realDataService'
 
 export default function Dashboard({ addToast, setCurrentPage }) {
+  const { t } = useTranslation()
   const [stats, setStats] = useState({
     todaySales: 0,
     todayBills: 0,
@@ -68,15 +70,15 @@ export default function Dashboard({ addToast, setCurrentPage }) {
     realDataService.invalidateCache()
     loadDashboardData().finally(() => {
       setIsRefreshing(false)
-      addToast('Dashboard refreshed', 'success')
+      addToast(t('dashboard.dashboardRefreshed', 'Dashboard refreshed'), 'success')
     })
   }
 
   const getGreeting = () => {
     const hour = currentTime.getHours()
-    if (hour < 12) return 'Good Morning'
-    if (hour < 17) return 'Good Afternoon'
-    return 'Good Evening'
+    if (hour < 12) return t('dashboard.goodMorning', 'Good Morning')
+    if (hour < 17) return t('dashboard.goodAfternoon', 'Good Afternoon')
+    return t('dashboard.goodEvening', 'Good Evening')
   }
 
   const getGreetingEmoji = () => {
@@ -176,7 +178,7 @@ export default function Dashboard({ addToast, setCurrentPage }) {
       <div className="dash">
         <header className="dash-header">
           <div>
-            <h1>📦 Inventory Dashboard</h1>
+            <h1>📦 {t('dashboard.inventoryDashboard', 'Inventory Dashboard')}</h1>
             <p>{storeName} • {formatDate()}</p>
           </div>
           <div className="dash-time">
@@ -189,11 +191,11 @@ export default function Dashboard({ addToast, setCurrentPage }) {
         <section className="dash-stats">
           <div className="stat-card blue">
             <Package size={20} />
-            <div><strong>{products.length}</strong><span>Total Products</span></div>
+            <div><strong>{products.length}</strong><span>{t('dashboard.totalProducts', 'Total Products')}</span></div>
           </div>
           <div className="stat-card red">
             <AlertTriangle size={20} />
-            <div><strong>{lowStockProducts.length}</strong><span>Low Stock</span></div>
+            <div><strong>{lowStockProducts.length}</strong><span>{t('dashboard.lowStock', 'Low Stock')}</span></div>
           </div>
         </section>
 
@@ -201,14 +203,14 @@ export default function Dashboard({ addToast, setCurrentPage }) {
         {lowStockProducts.length > 0 && (
           <div className="dash-card warning" style={{ marginBottom: '20px' }}>
             <div className="card-head">
-              <h3><AlertTriangle size={16} /> ⚠️ Low Stock Items</h3>
+              <h3><AlertTriangle size={16} /> ⚠️ {t('dashboard.lowStockItems', 'Low Stock Items')}</h3>
               <span className="count">{lowStockProducts.length}</span>
             </div>
             <div className="stock-list">
               {lowStockProducts.map(p => (
                 <div key={p.id} className="stock-row">
                   <span>{p.name}</span>
-                  <span className={p.stock === 0 ? 'out' : 'low'}>{p.stock} left</span>
+                  <span className={p.stock === 0 ? 'out' : 'low'}>{p.stock} {t('dashboard.left', 'left')}</span>
                 </div>
               ))}
             </div>
@@ -218,7 +220,7 @@ export default function Dashboard({ addToast, setCurrentPage }) {
         {lowStockProducts.length === 0 && (
           <div className="empty">
             <Package size={40} />
-            <p>All stock levels are healthy! ✅</p>
+            <p>{t('dashboard.allStockHealthy', 'All stock levels are healthy! ✅')}</p>
           </div>
         )}
 
@@ -248,27 +250,27 @@ export default function Dashboard({ addToast, setCurrentPage }) {
           marginBottom: '20px', textAlign: 'center', cursor: 'pointer',
         }} onClick={() => setCurrentPage('create-bill')}>
           <Plus size={40} style={{ marginBottom: '8px' }} />
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0 0 4px' }}>Create New Bill</h2>
-          <p style={{ opacity: 0.9, fontSize: '0.9rem', margin: 0 }}>Tap to start billing</p>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0 0 4px' }}>{t('dashboard.createNewBill', 'Create New Bill')}</h2>
+          <p style={{ opacity: 0.9, fontSize: '0.9rem', margin: 0 }}>{t('dashboard.tapToStart', 'Tap to start billing')}</p>
         </div>
 
         {/* Quick Stats */}
         <section className="dash-stats">
           <div className="stat-card green">
             <IndianRupee size={20} />
-            <div><strong>{formatCurrency(stats.todaySales)}</strong><span>Today's Sales</span></div>
+            <div><strong>{formatCurrency(stats.todaySales)}</strong><span>{t('dashboard.todaySales', "Today's Sales")}</span></div>
           </div>
           <div className="stat-card blue">
             <ShoppingBag size={20} />
-            <div><strong>{stats.todayBills}</strong><span>Bills Today</span></div>
+            <div><strong>{stats.todayBills}</strong><span>{t('dashboard.billsToday', 'Bills Today')}</span></div>
           </div>
         </section>
 
         {/* Recent Bills */}
         <div className="dash-card">
           <div className="card-head">
-            <h3><FileText size={16} /> Recent Bills</h3>
-            <button onClick={() => setCurrentPage('bills')}>View All</button>
+            <h3><FileText size={16} /> {t('dashboard.recentBills', 'Recent Bills')}</h3>
+            <button onClick={() => setCurrentPage('bills')}>{t('dashboard.viewAll', 'View All')}</button>
           </div>
           {bills.length > 0 ? (
             <div className="bills-list">
@@ -276,7 +278,7 @@ export default function Dashboard({ addToast, setCurrentPage }) {
                 <div key={bill.id} className="bill-row">
                   <div>
                     <strong>#{bill.bill_number || bill.id}</strong>
-                    <span>{bill.customer_name || 'Walk-in'}</span>
+                    <span>{bill.customer_name || t('dashboard.walkIn', 'Walk-in')}</span>
                   </div>
                   <div className="bill-amt">
                     <strong>{formatCurrency(bill.total || bill.amount)}</strong>
@@ -288,8 +290,8 @@ export default function Dashboard({ addToast, setCurrentPage }) {
           ) : (
             <div className="empty">
               <FileText size={40} />
-              <p>No bills yet today</p>
-              <button onClick={() => setCurrentPage('create-bill')}>Create First Bill</button>
+              <p>{t('dashboard.noBillsYet', 'No bills yet today')}</p>
+              <button onClick={() => setCurrentPage('create-bill')}>{t('dashboard.createFirstBill', 'Create First Bill')}</button>
             </div>
           )}
         </div>
@@ -323,14 +325,14 @@ export default function Dashboard({ addToast, setCurrentPage }) {
       }}>
         <div style={{ position: 'relative', zIndex: 1 }}>
           <p style={{ fontSize: '13px', opacity: 0.8, marginBottom: '4px', fontWeight: 500 }}>
-            📊 Today's Sales
+            📊 {t('dashboard.todaySales', "Today's Sales")}
           </p>
           <div className="currency-display currency-big" style={{ color: '#fbbf24', fontSize: '40px', fontWeight: 800 }}>
             {formatCurrency(stats.todaySales)}
           </div>
           <div style={{ display: 'flex', gap: '20px', marginTop: '12px', fontSize: '14px', opacity: 0.9 }}>
-            <span>🧾 {stats.todayBills} bills</span>
-            <span>📊 Avg {formatCurrency(stats.avgBillValue)}</span>
+            <span>🧾 {stats.todayBills} {t('bills.title', 'bills')}</span>
+            <span>📊 {t('dashboard.avgBill', 'Avg')} {formatCurrency(stats.avgBillValue)}</span>
           </div>
         </div>
         <div style={{ position: 'absolute', top: '-30px', right: '-30px', width: '120px', height: '120px', borderRadius: '50%', background: 'rgba(255,255,255,0.05)' }} />
@@ -341,10 +343,10 @@ export default function Dashboard({ addToast, setCurrentPage }) {
         <div className="low-stock-alert">
           <div className="alert-icon"><AlertTriangle size={20} /></div>
           <div className="alert-content">
-            <strong>⚠️ {lowStockProducts.length} items are low on stock!</strong>
+            <strong>⚠️ {t('dashboard.itemsLowStock', '{{count}} items are low on stock!', { count: lowStockProducts.length })}</strong>
             <span>{lowStockProducts.slice(0, 3).map(p => p.name).join(', ')}{lowStockProducts.length > 3 ? ` +${lowStockProducts.length - 3} more` : ''}</span>
           </div>
-          <button className="alert-btn" onClick={() => setCurrentPage('products')} aria-label="View low stock">Reorder →</button>
+          <button className="alert-btn" onClick={() => setCurrentPage('products')} aria-label="View low stock">{t('dashboard.reorder', 'Reorder')} →</button>
         </div>
       )}
 
@@ -353,10 +355,10 @@ export default function Dashboard({ addToast, setCurrentPage }) {
         {userRole === 'manager' && (
           <div className="quick-access-inline">
             <button className="qa-btn-inline primary" onClick={() => setCurrentPage('create-bill')}>
-              <Plus size={18} /> New Bill
+              <Plus size={18} /> {t('dashboard.newBill', 'New Bill')}
             </button>
             <button className="qa-btn-inline" onClick={() => setCurrentPage('staff')}>
-              <UserPlus size={18} /> Staff
+              <UserPlus size={18} /> {t('dashboard.staff', 'Staff')}
             </button>
           </div>
         )}
@@ -367,14 +369,14 @@ export default function Dashboard({ addToast, setCurrentPage }) {
             <span className={`plan-badge ${userPlan}`}>{userPlan.toUpperCase()}</span>
             <div className="qa-buttons">
               <button className="qa-btn-inline" onClick={() => setCurrentPage('staff')}>
-                <UserPlus size={18} /> Staff
+                <UserPlus size={18} /> {t('dashboard.staff', 'Staff')}
               </button>
               <button className="qa-btn-inline" onClick={() => setCurrentPage('stores')}>
-                <Store size={18} /> Stores
+                <Store size={18} /> {t('dashboard.stores', 'Stores')}
               </button>
               {userPlan === 'free' && (
                 <button className="qa-btn-inline upgrade" onClick={() => setCurrentPage('subscription')}>
-                  <ChevronRight size={18} /> Upgrade
+                  <ChevronRight size={18} /> {t('dashboard.upgrade', 'Upgrade')}
                 </button>
               )}
             </div>
@@ -386,21 +388,21 @@ export default function Dashboard({ addToast, setCurrentPage }) {
       <section className="dash-stats">
         <div className="stat-card green">
           <IndianRupee size={20} />
-          <div><strong>{formatCurrency(stats.todaySales)}</strong><span>Today's Sales</span></div>
+          <div><strong>{formatCurrency(stats.todaySales)}</strong><span>{t('dashboard.todaySales', "Today's Sales")}</span></div>
           <ArrowUpRight className="trend" size={16} />
         </div>
         <div className="stat-card blue">
           <ShoppingBag size={20} />
-          <div><strong>{stats.todayBills}</strong><span>Bills Today</span></div>
+          <div><strong>{stats.todayBills}</strong><span>{t('dashboard.billsToday', 'Bills Today')}</span></div>
         </div>
         <div className="stat-card purple">
           <TrendingUp size={20} />
-          <div><strong>{formatCurrency(stats.avgBillValue)}</strong><span>Avg Bill</span></div>
+          <div><strong>{formatCurrency(stats.avgBillValue)}</strong><span>{t('dashboard.avgBill', 'Avg Bill')}</span></div>
         </div>
         {stats.lowStockCount > 0 && (
           <div className="stat-card red clickable" onClick={() => setCurrentPage('products')}>
             <AlertTriangle size={20} />
-            <div><strong>{stats.lowStockCount}</strong><span>Low Stock</span></div>
+            <div><strong>{stats.lowStockCount}</strong><span>{t('dashboard.lowStock', 'Low Stock')}</span></div>
           </div>
         )}
       </section>
@@ -409,8 +411,8 @@ export default function Dashboard({ addToast, setCurrentPage }) {
       <section className="dash-grid">
         <div className="dash-card">
           <div className="card-head">
-            <h3><FileText size={16} /> Recent Bills</h3>
-            <button onClick={() => setCurrentPage('bills')}>View All</button>
+            <h3><FileText size={16} /> {t('dashboard.recentBills', 'Recent Bills')}</h3>
+            <button onClick={() => setCurrentPage('bills')}>{t('dashboard.viewAll', 'View All')}</button>
           </div>
           {bills.length > 0 ? (
             <div className="bills-list">
@@ -418,7 +420,7 @@ export default function Dashboard({ addToast, setCurrentPage }) {
                 <div key={bill.id} className="bill-row">
                   <div>
                     <strong>#{bill.bill_number || bill.id}</strong>
-                    <span>{bill.customer_name || 'Walk-in'}</span>
+                    <span>{bill.customer_name || t('dashboard.walkIn', 'Walk-in')}</span>
                   </div>
                   <div className="bill-amt">
                     <strong>{formatCurrency(bill.total || bill.amount)}</strong>
@@ -430,9 +432,9 @@ export default function Dashboard({ addToast, setCurrentPage }) {
           ) : (
             <div className="empty">
               <FileText size={40} />
-              <p>No bills yet</p>
+              <p>{t('dashboard.noBillsYetShort', 'No bills yet')}</p>
               {userRole === 'manager' && (
-                <button onClick={() => setCurrentPage('create-bill')}>Create First Bill</button>
+                <button onClick={() => setCurrentPage('create-bill')}>{t('dashboard.createFirstBill', 'Create First Bill')}</button>
               )}
             </div>
           )}
@@ -441,19 +443,19 @@ export default function Dashboard({ addToast, setCurrentPage }) {
         {lowStockProducts.length > 0 && (
           <div className="dash-card warning">
             <div className="card-head">
-              <h3><AlertTriangle size={16} /> Low Stock</h3>
+              <h3><AlertTriangle size={16} /> {t('dashboard.lowStock', 'Low Stock')}</h3>
               <span className="count">{lowStockProducts.length}</span>
             </div>
             <div className="stock-list">
               {lowStockProducts.slice(0, 5).map(p => (
                 <div key={p.id} className="stock-row">
                   <span>{p.name}</span>
-                  <span className={p.stock === 0 ? 'out' : 'low'}>{p.stock} left</span>
+                  <span className={p.stock === 0 ? 'out' : 'low'}>{p.stock} {t('dashboard.left', 'left')}</span>
                 </div>
               ))}
               {lowStockProducts.length > 5 && (
                 <button className="more" onClick={() => setCurrentPage('products')}>
-                  +{lowStockProducts.length - 5} more items
+                  {t('dashboard.moreItems', '+{{count}} more items', { count: lowStockProducts.length - 5 })}
                 </button>
               )}
             </div>

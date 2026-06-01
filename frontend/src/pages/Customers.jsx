@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Users, Search, Plus, Phone, IndianRupee, Calendar, X, Send, Check, AlertCircle, Loader2, Edit2, Trash2 } from 'lucide-react'
 import realDataService from '../services/realDataService'
 import api from '../services/api'
 import FloatingActionButton from '../components/FloatingActionButton'
 
 export default function Customers({ addToast, setCurrentPage }) {
+  const { t } = useTranslation()
     const [customers, setCustomers] = useState([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')

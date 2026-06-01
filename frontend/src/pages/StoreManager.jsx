@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Store, Plus, ChevronRight, Settings, Users, BarChart3, MapPin, Phone, Edit2, Trash2, Check, X } from 'lucide-react'
 import realDataService from '../services/realDataService'
 
 export default function StoreManager({ addToast, setCurrentPage, onStoreChange }) {
+  const { t } = useTranslation()
     const [stores, setStores] = useState([])
     const [activeStoreId, setActiveStoreId] = useState(localStorage.getItem('kadai_active_store_id') || null)
     const [showAddModal, setShowAddModal] = useState(false)

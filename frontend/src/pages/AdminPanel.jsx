@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
     Users, Store, CreditCard, Settings, Shield, Activity,
     TrendingUp, AlertTriangle, CheckCircle, XCircle,
@@ -31,6 +32,7 @@ const mockSubscriptions = [
 ]
 
 export default function AdminPanel({ addToast }) {
+  const { t } = useTranslation()
     const [activeTab, setActiveTab] = useState('overview')
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedItems, setSelectedItems] = useState([])

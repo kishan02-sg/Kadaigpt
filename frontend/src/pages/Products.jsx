@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Search, Plus, Package, AlertTriangle, TrendingUp, TrendingDown, Edit2, Trash2, X, Save, BarChart3, RefreshCw } from 'lucide-react'
 import realDataService from '../services/realDataService'
 import api from '../services/api'
@@ -29,6 +30,7 @@ function detectCategory(productName) {
 }
 
 export default function Products({ addToast, setCurrentPage }) {
+  const { t } = useTranslation()
     const [products, setProducts] = useState([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')

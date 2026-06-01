@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MessageCircle, Send, Users, Clock, CheckCheck, FileText, Plus, Phone, AlertCircle, Sparkles, Check, X, Loader2 } from 'lucide-react'
 import whatsappService from '../services/whatsapp'
 import api from '../services/api'
 import { demoCustomers } from '../services/demoData'
 
 export default function WhatsAppIntegration({ addToast }) {
+  const { t } = useTranslation()
     const [customers, setCustomers] = useState([])
     const [selectedCustomers, setSelectedCustomers] = useState([])
     const [message, setMessage] = useState('')

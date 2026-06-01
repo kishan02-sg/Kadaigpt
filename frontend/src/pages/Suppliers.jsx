@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Truck, Plus, Phone, MapPin, Package, Calendar, Clock, TrendingUp, X, Check, AlertTriangle, Search, Filter, Mail, Star, ShoppingCart, MessageCircle, Loader2, Edit2, Trash2, BarChart3, ArrowDown, ArrowUp, Box } from 'lucide-react'
 import whatsappService from '../services/whatsapp'
 import api from '../services/api'
 
 export default function Suppliers({ addToast }) {
+  const { t } = useTranslation()
     const [suppliers, setSuppliers] = useState([])
     const [orders, setOrders] = useState([])
     const [lowStockProducts, setLowStockProducts] = useState([])

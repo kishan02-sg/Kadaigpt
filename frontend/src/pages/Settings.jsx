@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Settings as SettingsIcon, Printer, RefreshCw, Check, AlertCircle, Wifi, WifiOff, Database, Key, Store, Bell, Sun, Moon, Palette, CheckCircle, XCircle, Loader2, Globe } from 'lucide-react'
 import api from '../services/api'
 import gstService from '../services/gstService'
 import { useTheme } from '../contexts/ThemeContext'
-import { useLanguage, LanguageSelector } from '../contexts/LanguageContext'
+import { SUPPORTED_LANGUAGES } from '../i18n'
 import WhatsAppSettings from '../components/WhatsAppSettings'
 
 export default function Settings({ addToast }) {
+    const { t, i18n } = useTranslation()
     const { theme, toggleTheme } = useTheme()
-    const { language, setLanguage, t, availableLanguages } = useLanguage()
+    const language = i18n.language
+    const setLanguage = (code) => i18n.changeLanguage(code)
+    const availableLanguages = SUPPORTED_LANGUAGES
     const [printers, setPrinters] = useState([])
     const [loadingPrinters, setLoadingPrinters] = useState(false)
     const [selectedPrinter, setSelectedPrinter] = useState('auto')
@@ -294,7 +298,7 @@ export default function Settings({ addToast }) {
                     </div>
                     <div className="settings-form">
                         <div className="form-group">
-                            <label className="form-label">App Language</label>
+                            <label className="form-label">{t('settings.language', 'App Language')}</label>
                             <select
                                 className="form-input"
                                 value={language}
@@ -305,7 +309,7 @@ export default function Settings({ addToast }) {
                             >
                                 {availableLanguages.map(lang => (
                                     <option key={lang.code} value={lang.code}>
-                                        {lang.flag} {lang.name} ({lang.native})
+                                        {lang.flag} {lang.name} ({lang.nativeName})
                                     </option>
                                 ))}
                             </select>

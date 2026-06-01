@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { TrendingUp, ShoppingBag, Users, IndianRupee, ArrowUpRight, ArrowDownRight, Minus, Zap, BarChart3, PieChart, Loader2, Sparkles, Calendar, WifiOff } from 'lucide-react'
 import realDataService from '../services/realDataService'
 import BusinessHealthCard from '../components/BusinessHealthCard'
@@ -8,6 +9,7 @@ import api from '../services/api'
 
 
 export default function Analytics({ addToast, setCurrentPage }) {
+  const { t } = useTranslation()
     const [period, setPeriod] = useState('week')
     const [loading, setLoading] = useState(true)
     const [analytics, setAnalytics] = useState({

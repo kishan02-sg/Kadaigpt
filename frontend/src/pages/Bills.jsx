@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Search, Filter, Download, Eye, Printer, Calendar, X, ChevronDown, FileText, TrendingUp, ArrowUpRight, XCircle, AlertTriangle } from 'lucide-react'
 import realDataService from '../services/realDataService'
 import api from '../services/api'
@@ -6,6 +7,7 @@ import EmptyState from '../components/EmptyState'
 import FloatingActionButton from '../components/FloatingActionButton'
 
 export default function Bills({ addToast, setCurrentPage }) {
+  const { t } = useTranslation()
     const [bills, setBills] = useState([])
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')

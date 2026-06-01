@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
     Brain, TrendingUp, TrendingDown, AlertTriangle, Lightbulb,
     ShoppingCart, Users, Package, IndianRupee, Sparkles,
@@ -8,6 +9,7 @@ import realDataService from '../services/realDataService'
 import api from '../services/api'
 
 export default function AIInsights({ addToast }) {
+  const { t } = useTranslation()
     const [insights, setInsights] = useState(null)
     const [loading, setLoading] = useState(true)
     const [lastUpdated, setLastUpdated] = useState(null)

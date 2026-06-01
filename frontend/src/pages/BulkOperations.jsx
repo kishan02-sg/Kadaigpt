@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
     Download,
     Upload,
@@ -16,6 +17,7 @@ import api from '../services/api'
 import '../styles/BulkOperations.css'
 
 export default function BulkOperations({ addToast }) {
+  const { t } = useTranslation()
     const [activeTab, setActiveTab] = useState('export')
     const [loading, setLoading] = useState(false)
     const [importResults, setImportResults] = useState(null)

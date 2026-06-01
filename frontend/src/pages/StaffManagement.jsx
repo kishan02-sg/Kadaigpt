@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Users, UserPlus, Shield, ShieldCheck, ShieldOff, Phone, Search, X, Check, Copy, Key, AlertTriangle } from 'lucide-react'
 import api from '../services/api'
 
 export default function StaffManagement({ addToast }) {
+  const { t } = useTranslation()
     const [staff, setStaff] = useState([])
     const [isLoading, setIsLoading] = useState(true)
     const [showAddModal, setShowAddModal] = useState(false)

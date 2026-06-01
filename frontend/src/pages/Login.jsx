@@ -1,8 +1,10 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ShoppingCart, Mail, Lock, User, ArrowRight, Loader2, Sparkles, Zap, Shield, Wifi, Eye, EyeOff, Square, CheckSquare, Building, Users } from 'lucide-react'
 import api from '../services/api'
 
 export default function Login({ onLogin }) {
+  const { t } = useTranslation()
   const [isLogin, setIsLogin] = useState(true)
   const [loginTab, setLoginTab] = useState('owner') // 'owner' or 'staff'
   const [loading, setLoading] = useState(false)

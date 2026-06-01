@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
     Wallet, Plus, TrendingUp, TrendingDown, Calendar,
     Filter, Download, PieChart, Receipt, Trash2, Edit2,
@@ -27,6 +28,7 @@ const demoExpenses = [
 ]
 
 export default function ExpenseTracker({ addToast }) {
+  const { t } = useTranslation()
     const [expenses, setExpenses] = useState([])
     const [loading, setLoading] = useState(true)
     const [showAddModal, setShowAddModal] = useState(false)

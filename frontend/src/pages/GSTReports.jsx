@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Receipt, Download, FileText, Calendar, Check, Clock, IndianRupee, AlertCircle, ChevronDown, RefreshCw, Loader2 } from 'lucide-react'
 import realDataService from '../services/realDataService'
 import api from '../services/api'
 
 export default function GSTReports({ addToast }) {
+  const { t } = useTranslation()
     const [selectedMonth, setSelectedMonth] = useState('Feb 2026')
     const [generating, setGenerating] = useState(false)
     const [loading, setLoading] = useState(true)

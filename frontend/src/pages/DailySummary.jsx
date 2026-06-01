@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
     FileText, Download, Mail, Share2, Calendar, TrendingUp,
     TrendingDown, IndianRupee, ShoppingCart, Users, Package,
@@ -7,6 +8,7 @@ import {
 import realDataService from '../services/realDataService'
 
 export default function DailySummary({ addToast }) {
+  const { t } = useTranslation()
     const [summary, setSummary] = useState(null)
     const [loading, setLoading] = useState(true)
     const [sendingEmail, setSendingEmail] = useState(false)

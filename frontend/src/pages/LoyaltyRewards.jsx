@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Gift, Star, Users, Trophy, ArrowUpRight, Plus, X, Check, Award, Zap, CreditCard, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import api from '../services/api'
 import realDataService from '../services/realDataService'
@@ -21,6 +22,7 @@ const rewardOptions = [
 ]
 
 export default function LoyaltyRewards({ addToast }) {
+  const { t } = useTranslation()
     const [customers, setCustomers] = useState([])
     const [loading, setLoading] = useState(true)
     const [selectedCustomer, setSelectedCustomer] = useState(null)

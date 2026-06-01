@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Search, Plus, Minus, Trash2, Printer, Save, ShoppingCart, X, Eye, Loader2, MessageSquare, Send, Package, Scale } from 'lucide-react'
 import realDataService from '../services/realDataService'
 import whatsappService from '../services/whatsapp'
@@ -9,6 +10,7 @@ import { demoProducts } from '../services/demoData'
 const categories = ["All", "Grains", "Pulses", "Essentials", "Oils", "Beverages", "Dairy", "General", "Snacks", "Packaged", "Household", "Personal Care"]
 
 export default function CreateBill({ addToast, setCurrentPage }) {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [products, setProducts] = useState([])

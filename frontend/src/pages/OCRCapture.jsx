@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Camera, Sparkles, Zap, FileText, Bot, ArrowRight, Star } from 'lucide-react'
 
 export default function OCRCapture({ addToast, setCurrentPage }) {
+  const { t } = useTranslation()
     const [showInterest, setShowInterest] = useState(false)
 
     const features = [
