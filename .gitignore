@@ -6,10 +6,15 @@ __pycache__/
 .eggs/
 *.egg-info/
 
-# Environment
+# Environment — NEVER push real secrets
 .env
+.env.*
+!.env.example
+!.env.*.example
+!.env.development
+!.env.production
 .env.local
-.env.production.local
+.env.*.local
 .venv/
 venv/
 ENV/
