@@ -112,7 +112,7 @@ export default function AdminPanel({ addToast }) {
                 <div>
                     <h1 className="page-title">
                         <Shield size={28} />
-                        Admin Dashboard
+                        {t('adminPanel.title', 'Admin Dashboard')}
                     </h1>
                     <p className="page-subtitle">Manage stores, users, and subscriptions</p>
                 </div>

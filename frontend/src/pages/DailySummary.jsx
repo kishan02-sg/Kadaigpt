@@ -267,7 +267,7 @@ export default function DailySummary({ addToast }) {
             <div className="page-header">
                 <div>
                     <h1 className="page-title">
-                        <FileText size={28} /> Daily Summary Report
+                        <FileText size={28} /> {t('dailySummary.title', 'Daily Summary Report')}
                     </h1>
                     <p className="page-subtitle">
                         {summary.date} • {summary.tamilDate}

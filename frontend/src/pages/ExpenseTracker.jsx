@@ -138,7 +138,7 @@ export default function ExpenseTracker({ addToast }) {
             <div className="page-header">
                 <div>
                     <h1 className="page-title">
-                        <Wallet size={28} /> Expense Tracker
+                        <Wallet size={28} /> {t('expenses.title', 'Expense Tracker')}
                     </h1>
                     <p className="page-subtitle">
                         செலவுகளை கண்காணிக்கவும் • Track All Store Expenses

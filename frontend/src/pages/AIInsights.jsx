@@ -167,7 +167,7 @@ export default function AIInsights({ addToast }) {
             <div className="page-header">
                 <div>
                     <h1 className="page-title">
-                        <Brain size={28} /> AI Insights
+                        <Brain size={28} /> {t('aiInsights.title', 'AI Insights')}
                     </h1>
                     <p className="page-subtitle">
                         Powered by KadaiGPT • புத்திசாலி பரிந்துரைகள்

@@ -92,7 +92,7 @@ export default function Subscription({ addToast }) {
     return (
         <div className="subscription-page">
             <div className="page-header">
-                <h1>Choose Your Plan</h1>
+                <h1>{t('subscription.title', 'Choose Your Plan')}</h1>
                 <p>Choose the right plan for your business</p>
                 <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', marginTop: '4px' }}>₹10/day — Cheaper than a chai! Save ₹2,000/month on accountant fees</p>
             </div>
