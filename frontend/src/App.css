@@ -487,6 +487,36 @@
 }
 
 /* ============================================
+   Billing page — focused mobile layout
+   The cart bottom-sheet, bottom nav and the two FABs all stacked at the
+   bottom and overlapped, making checkout unreachable. On phones, give the
+   billing screen a clean bottom: hide the bottom nav + FABs and anchor the
+   cart sheet to the very bottom so its checkout button is fully visible.
+   ============================================ */
+@media (max-width: 900px) {
+  .page-create-bill .mobile-nav,
+  .page-create-bill .unified-ai-fab,
+  .page-create-bill .quick-action-fab {
+    display: none !important;
+  }
+
+  .page-create-bill .cart-panel {
+    /* mobile.css collapses the cart with translateY but CreateBill never renders
+       the expand toggle, so it was stuck off-screen. Cancel that transform and
+       anchor the sheet to the bottom so the checkout button is always reachable. */
+    transform: none !important;
+    bottom: 0 !important;
+    max-height: 55vh !important;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* No bottom nav here, so reserve room for the always-visible cart sheet */
+  .page-create-bill .main-content.no-sidebar {
+    padding-bottom: 58vh;
+  }
+}
+
+/* ============================================
    TOAST NOTIFICATIONS
    ============================================ */
 .toast-container {

@@ -355,7 +355,7 @@ function App() {
     }
 
     return (
-        <div className={`app-layout no-sidebar role-${userRole}`}>
+        <div className={`app-layout no-sidebar role-${userRole} ${currentPage === 'create-bill' ? 'page-create-bill' : ''}`}>
             {/* Offline Status Indicator */}
             <OfflineIndicator />
 
