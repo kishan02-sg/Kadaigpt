@@ -290,6 +290,18 @@ _SERVERLESS_SCHEMA_STATEMENTS = [
         updated_at TIMESTAMPTZ
     )""",
     "CREATE INDEX IF NOT EXISTS idx_auth_security_kind_key ON auth_security_state(kind, key)",
+    """CREATE TABLE IF NOT EXISTS expenses (
+        id SERIAL PRIMARY KEY,
+        store_id INTEGER NOT NULL,
+        category VARCHAR(50) DEFAULT 'other',
+        description VARCHAR(255) NOT NULL,
+        amount DOUBLE PRECISION DEFAULT 0,
+        expense_date TIMESTAMPTZ,
+        recurring BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_expenses_store_date ON expenses(store_id, expense_date DESC)",
 ]
 
 

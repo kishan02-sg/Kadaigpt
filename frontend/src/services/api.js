@@ -844,6 +844,23 @@ class ApiService {
         return this._inAppNotifFetch('/mark-all-read', { method: 'PUT' })
     }
 
+    // ==================== EXPENSES ====================
+    async getExpenses(category) {
+        const q = category && category !== 'all' ? `?category=${encodeURIComponent(category)}` : ''
+        return this.request(`/expenses${q}`)
+    }
+
+    async createExpense(expense) {
+        return this.request('/expenses', {
+            method: 'POST',
+            body: JSON.stringify(expense),
+        })
+    }
+
+    async deleteExpense(id) {
+        return this.request(`/expenses/${id}`, { method: 'DELETE' })
+    }
+
     // ==================== AI AGENTS ENDPOINTS ====================
 
     async getAgentSuggestions(storeId = 1) {

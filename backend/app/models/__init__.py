@@ -509,3 +509,21 @@ class AuthSecurityState(Base):
     expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class Expense(Base):
+    """Store expense record (rent, salary, utilities, inventory, etc.)."""
+    __tablename__ = "expenses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False, index=True)
+    category = Column(String(50), default="other")   # rent, salary, utilities, inventory, transport, other
+    description = Column(String(255), nullable=False)
+    amount = Column(Float, default=0.0)
+    expense_date = Column(DateTime(timezone=True))    # when the expense occurred
+    recurring = Column(Boolean, default=False)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    store = relationship("Store")

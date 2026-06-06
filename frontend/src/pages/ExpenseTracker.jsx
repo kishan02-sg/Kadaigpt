@@ -5,6 +5,7 @@ import {
     Filter, Download, PieChart, Receipt, Trash2, Edit2,
     DollarSign, ShoppingBag, Truck, Zap, Users, Building
 } from 'lucide-react'
+import api from '../services/api'
 
 const expenseCategories = [
     { id: 'rent', name: 'Rent', icon: Building, color: '#8B5CF6' },
@@ -46,31 +47,29 @@ export default function ExpenseTracker({ addToast }) {
         loadExpenses()
     }, [])
 
-    const loadExpenses = () => {
+    const loadExpenses = async () => {
         setLoading(true)
-
-        // Always load from localStorage - no more demo mode
-        const savedExpenses = localStorage.getItem('kadai_expenses')
-        if (savedExpenses) {
+        try {
+            // Persisted in the database (per store)
+            const data = await api.getExpenses()
+            const list = Array.isArray(data) ? data : []
+            setExpenses(list)
+            // Cache for offline viewing
+            localStorage.setItem('kadai_expenses', JSON.stringify(list))
+        } catch (e) {
+            // Offline / not logged in — fall back to the last cached copy
+            console.warn('[Expenses] API load failed, using cache:', e?.message)
+            const saved = localStorage.getItem('kadai_expenses')
             try {
-                const parsed = JSON.parse(savedExpenses)
+                const parsed = saved ? JSON.parse(saved) : []
                 setExpenses(Array.isArray(parsed) ? parsed : [])
             } catch {
                 setExpenses([])
             }
-        } else {
-            // No expenses yet - show empty state
-            setExpenses([])
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }
-
-    // Save expenses to localStorage for persistence
-    useEffect(() => {
-        if (expenses.length > 0) {
-            localStorage.setItem('kadai_expenses', JSON.stringify(expenses))
-        }
-    }, [expenses])
 
     const filteredExpenses = expenses.filter(e =>
         filter === 'all' || e.category === filter
@@ -83,19 +82,30 @@ export default function ExpenseTracker({ addToast }) {
         total: expenses.filter(e => e.category === cat.id).reduce((sum, e) => sum + e.amount, 0)
     }))
 
-    const handleAddExpense = () => {
+    const handleAddExpense = async () => {
         if (!newExpense.description || !newExpense.amount) {
             addToast('Please fill all fields', 'error')
             return
         }
 
-        const expense = {
-            id: Date.now(),
-            ...newExpense,
-            amount: parseFloat(newExpense.amount)
+        const payload = {
+            category: newExpense.category,
+            description: newExpense.description,
+            amount: parseFloat(newExpense.amount),
+            date: newExpense.date,
+            recurring: newExpense.recurring,
         }
 
-        setExpenses([expense, ...expenses])
+        try {
+            const saved = await api.createExpense(payload)
+            setExpenses(prev => [saved, ...prev])
+            addToast('Expense added successfully!', 'success')
+        } catch (e) {
+            console.warn('[Expenses] create failed:', e?.message)
+            addToast('Could not save expense. Please try again.', 'error')
+            return
+        }
+
         setShowAddModal(false)
         setNewExpense({
             category: 'other',
@@ -104,12 +114,19 @@ export default function ExpenseTracker({ addToast }) {
             date: new Date().toISOString().split('T')[0],
             recurring: false
         })
-        addToast('Expense added successfully!', 'success')
     }
 
-    const handleDelete = (id) => {
-        setExpenses(expenses.filter(e => e.id !== id))
-        addToast('Expense deleted', 'info')
+    const handleDelete = async (id) => {
+        const prev = expenses
+        setExpenses(expenses.filter(e => e.id !== id))  // optimistic
+        try {
+            await api.deleteExpense(id)
+            addToast('Expense deleted', 'info')
+        } catch (e) {
+            console.warn('[Expenses] delete failed:', e?.message)
+            setExpenses(prev)  // rollback
+            addToast('Could not delete expense.', 'error')
+        }
     }
 
     const getCategoryInfo = (catId) => {
