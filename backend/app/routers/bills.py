@@ -347,36 +347,46 @@ async def create_bill(
     )
     raw_items = [dict(row) for row in items_row.mappings().all()]
     
-    # ⭐ LOYALTY POINTS: Auto-award points to customer (1 point per ₹10 spent)
+    # ⭐ LOYALTY POINTS + CREDIT/DUE: update the customer record
     if bill_data.customer_phone:
         try:
             points_earned = int(totals["total_amount"] / 10)
-            
+            # A "Due"/Credit bill is unpaid — add the full amount to the customer's
+            # outstanding credit (khata) so it reflects on the Customers page.
+            due_amount = totals["total_amount"] if bill_data.payment_method == PaymentMethod.CREDIT else 0
+            # Use a bound timestamp instead of NOW() — NOW() is Postgres-only and
+            # errors on SQLite, which silently broke this whole block locally.
+            now_ts = datetime.utcnow()
+
             cust_row = await db.execute(
                 text("SELECT id, name, loyalty_points, total_purchases FROM customers "
                      "WHERE store_id = :store_id AND phone = :phone"),
                 {"store_id": current_user.store_id, "phone": bill_data.customer_phone}
             )
             existing = cust_row.mappings().first()
-            
+
             if existing:
                 await db.execute(
                     text("UPDATE customers SET loyalty_points = loyalty_points + :pts, "
                          "total_purchases = COALESCE(total_purchases, 0) + :total, "
-                         "last_purchase = NOW() WHERE id = :cid"),
-                    {"pts": points_earned, "total": totals["total_amount"], "cid": existing["id"]}
+                         "credit = COALESCE(credit, 0) + :due, "
+                         "last_purchase = :now WHERE id = :cid"),
+                    {"pts": points_earned, "total": totals["total_amount"], "due": due_amount,
+                     "now": now_ts, "cid": existing["id"]}
                 )
                 await db.commit()
             else:
                 await db.execute(
                     text("INSERT INTO customers (store_id, name, phone, loyalty_points, total_purchases, last_purchase, credit) "
-                         "VALUES (:store_id, :name, :phone, :pts, :total, NOW(), 0)"),
+                         "VALUES (:store_id, :name, :phone, :pts, :total, :now, :due)"),
                     {
                         "store_id": current_user.store_id,
                         "name": bill_data.customer_name or "Walk-in",
                         "phone": bill_data.customer_phone,
                         "pts": points_earned,
                         "total": totals["total_amount"],
+                        "due": due_amount,
+                        "now": now_ts,
                     }
                 )
                 await db.commit()
