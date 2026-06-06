@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Search, Plus, Minus, Trash2, Printer, Save, ShoppingCart, X, Eye, Loader2, MessageSquare, Send, Package, Scale } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, Printer, Save, ShoppingCart, X, Eye, Loader2, MessageSquare, Send, Package, Scale, ArrowLeft } from 'lucide-react'
 import realDataService from '../services/realDataService'
 import whatsappService from '../services/whatsapp'
 import api from '../services/api'
@@ -600,6 +600,14 @@ export default function CreateBill({ addToast, setCurrentPage }) {
   return (
     <div className="create-bill">
       <div className="page-header">
+        <button
+          className="back-icon-btn"
+          onClick={() => setCurrentPage?.('dashboard')}
+          aria-label="Back"
+          title="Back"
+        >
+          <ArrowLeft size={20} />
+        </button>
         <div className="header-left">
           <h1 className="page-title">🧾 Create New Bill</h1>
           <p className="page-subtitle">
@@ -618,14 +626,6 @@ export default function CreateBill({ addToast, setCurrentPage }) {
               </span>
             )}
           </p>
-        </div>
-        <div className="header-actions">
-          <button
-            className="btn btn-ghost btn-sm"
-            onClick={() => setCurrentPage?.('dashboard')}
-          >
-            ← Back
-          </button>
         </div>
       </div>
 
@@ -1691,9 +1691,29 @@ export default function CreateBill({ addToast, setCurrentPage }) {
           
           .page-header {
             display: flex !important;
-            padding: 12px 16px;
+            flex-direction: row !important;
+            align-items: center !important;
+            gap: 10px;
+            padding: 8px 12px 4px;
           }
-          .header-left .page-title { font-size: 1.1rem; }
+          .back-icon-btn {
+            width: 36px;
+            height: 36px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-tertiary, #1f2937);
+            border: 1px solid var(--border-subtle, #374151);
+            border-radius: 10px;
+            color: var(--text-secondary, #cbd5e1);
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+          }
+          .back-icon-btn:active { transform: scale(0.94); }
+          .back-icon-btn:hover { background: var(--primary-500, #f97316); color: #fff; }
+          .header-left .page-title { font-size: 1.1rem; margin: 0; }
+          .header-left .page-subtitle { font-size: 0.75rem; margin: 1px 0 0; }
           
           /* Products on top, scrollable */
           .products-section {
