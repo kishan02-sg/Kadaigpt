@@ -57,19 +57,18 @@ export default function WhatsAppIntegration({ addToast }) {
         setMessage(template.template)
     }
 
-    const handleQuickSend = () => {
+    const handleQuickSend = async () => {
         if (!quickPhone || !quickMessage) {
             addToast('Please enter phone and message', 'error')
             return
         }
-
-        whatsappService.openWhatsApp(quickPhone, quickMessage)
-        addToast('Opening WhatsApp...', 'success')
+        const r = await api.sendWhatsAppMessage(quickPhone, quickMessage)
+        addToast(r.sent ? '✅ Message sent on WhatsApp' : 'Opening WhatsApp...', 'success')
         setQuickPhone('')
         setQuickMessage('')
     }
 
-    const handleSendToSelected = () => {
+    const handleSendToSelected = async () => {
         if (selectedCustomers.length === 0) {
             addToast('Please select customers', 'error')
             return
@@ -79,7 +78,6 @@ export default function WhatsAppIntegration({ addToast }) {
             return
         }
 
-        // Send to first selected customer (WhatsApp opens one at a time)
         const customer = selectedCustomers[0]
         const parsedMessage = whatsappService.parseTemplate(message, {
             name: customer.name,
@@ -88,10 +86,8 @@ export default function WhatsAppIntegration({ addToast }) {
             date: new Date().toLocaleDateString('en-IN')
         })
 
-        whatsappService.openWhatsApp(customer.phone, parsedMessage)
-        addToast(`Message sent to ${customer.name}`, 'success')
-
-        // Remove from selection
+        const r = await api.sendWhatsAppMessage(customer.phone, parsedMessage)
+        addToast(r.sent ? `✅ Sent to ${customer.name}` : `Opening WhatsApp for ${customer.name}...`, 'success')
         setSelectedCustomers(prev => prev.filter(c => c.id !== customer.id))
     }
 
@@ -102,19 +98,25 @@ export default function WhatsAppIntegration({ addToast }) {
         }
 
         setSending(true)
-        setProgress({ current: 0, total: customersWithDue.length })
+        // When a provider is configured we can send to EVERYONE automatically.
+        // Without one, fall back to opening wa.me for the first few (one tab each).
+        const status = await api.whatsappStatus()
+        const autoSend = !!status?.auto_send
+        const targets = autoSend ? customersWithDue : customersWithDue.slice(0, 3)
+        setProgress({ current: 0, total: targets.length })
 
-        // For demo, we'll open one by one with delay
-        for (let i = 0; i < Math.min(customersWithDue.length, 3); i++) {
-            const customer = customersWithDue[i]
-            await new Promise(resolve => setTimeout(resolve, 1500))
-
-            whatsappService.sendPaymentReminder(customer, storeName)
+        let sent = 0
+        for (let i = 0; i < targets.length; i++) {
+            const customer = targets[i]
+            const msg = whatsappService.generatePaymentReminder(customer, storeName, customer.credit)
+            const r = await api.sendWhatsAppMessage(customer.phone, msg)
+            if (r.sent) sent++
             setProgress(prev => ({ ...prev, current: i + 1 }))
+            if (!autoSend) await new Promise(resolve => setTimeout(resolve, 1200))
         }
 
         setSending(false)
-        addToast(`Reminders sent to ${Math.min(customersWithDue.length, 3)} customers!`, 'success')
+        addToast(autoSend ? `✅ Reminders sent to ${sent} customers!` : `Opened WhatsApp for ${targets.length} customers`, 'success')
     }
 
     const toggleCustomerSelection = (customer) => {

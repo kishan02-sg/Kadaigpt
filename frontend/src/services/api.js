@@ -886,6 +886,33 @@ class ApiService {
         return this.request(`/expenses/${id}`, { method: 'DELETE' })
     }
 
+    // ==================== WHATSAPP (automated sending) ====================
+    async whatsappStatus() {
+        try { return await this.request('/whatsapp/status') } catch { return { auto_send: false, provider: null } }
+    }
+
+    async whatsappSend(phone, message) {
+        return this.request('/whatsapp/send', {
+            method: 'POST',
+            body: JSON.stringify({ phone, message }),
+        })
+    }
+
+    // Send via the backend (auto-send when a provider is configured); if the
+    // backend isn't configured it returns a wa.me link which we open instead.
+    // Always resolves — never throws — so callers don't need try/catch.
+    async sendWhatsAppMessage(phone, message) {
+        try {
+            const res = await this.whatsappSend(phone, message)
+            if (res?.success) return { sent: true, provider: res?.data?.provider }
+            if (res?.whatsapp_link) { window.open(res.whatsapp_link, '_blank'); return { sent: false, opened: true } }
+        } catch { /* fall through to wa.me */ }
+        const digits = (phone || '').replace(/\D/g, '')
+        const pn = digits.length === 10 ? '91' + digits : digits
+        window.open(`https://wa.me/${pn}?text=${encodeURIComponent(message)}`, '_blank')
+        return { sent: false, opened: true }
+    }
+
     // ==================== AI AGENTS ENDPOINTS ====================
 
     async getAgentSuggestions(storeId = 1) {

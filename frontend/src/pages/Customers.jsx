@@ -181,12 +181,11 @@ export default function Customers({ addToast, setCurrentPage }) {
         }
     }
 
-    const sendReminder = (customer) => {
-        // Open WhatsApp with reminder message
+    const sendReminder = async (customer) => {
         const message = `Hi ${customer.name}, this is a friendly reminder about your pending dues of ₹${customer.credit}. Please clear at your earliest convenience. Thank you!`
-        const url = `https://wa.me/91${customer.phone}?text=${encodeURIComponent(message)}`
-        window.open(url, '_blank')
-        addToast(`Reminder sent to ${customer.name}`, 'success')
+        // Auto-sends when a WhatsApp provider is configured; otherwise opens wa.me.
+        const r = await api.sendWhatsAppMessage(customer.phone, message)
+        addToast(r.sent ? `✅ Reminder sent to ${customer.name}` : `Opening WhatsApp for ${customer.name}...`, 'success')
     }
 
     // Redeem loyalty points: 10000 points = ₹100 discount (100 points = ₹1)
