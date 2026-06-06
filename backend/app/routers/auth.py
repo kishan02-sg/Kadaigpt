@@ -22,6 +22,7 @@ from app.utils.password import validate_password_strength
 from app.services import auth_state
 from app.services.email_service import email_service
 from app.services.msg91_service import msg91_service
+from app.services.resend_service import resend_service
 import os
 import hmac
 from app.schemas import (
@@ -882,25 +883,39 @@ class VerifyEmailOTPRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
 
 
+def _otp_email_html(otp: str, name: str = "") -> str:
+    return f"""
+    <p>Hi {name or 'there'},</p>
+    <p>Your KadaiGPT verification code is:</p>
+    <p style="font-size:28px;font-weight:800;letter-spacing:6px">{otp}</p>
+    <p>This code expires in {EMAIL_OTP_EXPIRE_MINUTES} minutes. If you didn't
+    request it, you can ignore this email.</p>
+    """
+
+
 async def _deliver_otp_email(to_email: str, otp: str, name: str = "") -> None:
-    """Best-effort OTP delivery: MSG91 → SMTP → log (dev)."""
+    """Best-effort OTP delivery, trying whichever provider is configured:
+    Resend → MSG91 → SMTP (Brevo/SendGrid/Resend/Gmail) → log (dev)."""
+    subject = "Your KadaiGPT verification code"
+
+    # 1) Resend (simplest dev-friendly API)
+    if resend_service.enabled and await resend_service.send_email(to_email, subject, _otp_email_html(otp, name)):
+        return
+
+    # 2) MSG91 (template-based)
     if msg91_service.enabled and await msg91_service.send_email_otp(to_email, otp, name):
         return
+
+    # 3) Generic SMTP — works with Brevo / SendGrid / Resend / Gmail credentials
     if email_service.enabled:
-        html = f"""
-        <p>Hi {name or 'there'},</p>
-        <p>Your KadaiGPT verification code is:</p>
-        <p style="font-size:28px;font-weight:800;letter-spacing:6px">{otp}</p>
-        <p>This code expires in {EMAIL_OTP_EXPIRE_MINUTES} minutes. If you didn't
-        request it, you can ignore this email.</p>
-        """
         try:
-            if await email_service.send_email_async(to_email, "Your KadaiGPT verification code", html):
+            if await email_service.send_email_async(to_email, subject, _otp_email_html(otp, name)):
                 return
         except Exception as e:
             logger.warning(f"[Email OTP] SMTP send failed: {type(e).__name__}: {e}")
-    # No delivery channel configured — log so it's usable in dev/testing.
-    logger.info(f"[Email OTP] (not delivered — configure MSG91/SMTP) {to_email}: {otp}")
+
+    # 4) Nothing configured — log so it's usable in dev/testing.
+    logger.info(f"[Email OTP] (not delivered — configure Resend/MSG91/SMTP) {to_email}: {otp}")
 
 
 @router.post("/forgot-password-email-otp")

@@ -251,12 +251,21 @@ class EmailService:
         
         try:
             msg = self._create_message(to, subject, html_content, text_content)
-            
-            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.smtp_user, self.smtp_password)
-                server.send_message(msg)
-            
+
+            # Port 465 = implicit SSL (SMTP_SSL); 587/others = STARTTLS.
+            # Works with Brevo (smtp-relay.brevo.com:587), SendGrid
+            # (smtp.sendgrid.net:587, user "apikey"), Resend (smtp.resend.com),
+            # Gmail, etc.
+            if self.smtp_port == 465:
+                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=15) as server:
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=15) as server:
+                    server.starttls()
+                    server.login(self.smtp_user, self.smtp_password)
+                    server.send_message(msg)
+
             logger.info(f"[Email] Sent successfully to {to}")
             return True
         except Exception as e:
