@@ -72,21 +72,26 @@ engine_kwargs = {
 
 if not is_sqlite:
     if is_serverless:
-        # Serverless (Vercel): Use a SMALL pool instead of NullPool
-        # Warm instances reuse the same Python process, so keeping 1 connection
-        # alive avoids the ~3s SSL handshake on every request
+        # Serverless (Vercel) + Supabase Transaction Pooler (pgbouncer).
+        # pgbouncer in transaction mode does NOT support prepared statements, and
+        # reusing a connection across requests causes
+        #   'prepared statement "__asyncpg_stmt_x__" already exists'
+        # So: use NullPool (fresh connection per request) AND fully disable
+        # asyncpg/SQLAlchemy prepared-statement caching + use unique statement
+        # names. This is the documented SQLAlchemy fix for pgbouncer.
+        import uuid as _uuid
         engine_kwargs.update({
-            "pool_pre_ping": True,         # Verify connection is alive before use
-            "pool_size": 1,                # Single connection (one request at a time)
-            "max_overflow": 2,             # Allow 2 extra under burst
-            "pool_recycle": 300,           # Recycle every 5 min (matches Vercel warm time)
-            "pool_timeout": 10,            # Fail fast if pool exhausted
+            "poolclass": NullPool,
             "connect_args": {
                 "server_settings": {
                     "application_name": "kadaigpt-serverless",
                     "statement_timeout": "25000",
                 },
-                "command_timeout": 10,     # 10s connection timeout
+                "command_timeout": 10,
+                # Disable prepared statements (pgbouncer transaction mode):
+                "statement_cache_size": 0,                 # asyncpg statement cache off
+                "prepared_statement_cache_size": 0,        # SQLAlchemy dialect cache off
+                "prepared_statement_name_func": lambda: f"__asyncpg_{_uuid.uuid4()}__",
             }
         })
     else:
