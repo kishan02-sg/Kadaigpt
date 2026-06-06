@@ -528,7 +528,7 @@ function App() {
             </div>
 
             {/* Mobile Bottom Nav */}
-            <MobileNav currentPage={currentPage} setCurrentPage={setCurrentPage} />
+            <MobileNav currentPage={currentPage} setCurrentPage={setCurrentPage} userRole={userRole} />
 
             {/* Offline Banner */}
             {!isOnline && (

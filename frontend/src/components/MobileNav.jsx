@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Home, ShoppingCart, Package, Users, MoreHorizontal, X, FileText, BarChart3, Settings, Wallet, ClipboardList, Truck, MessageCircle, Star, Upload, UserCog, Store, CreditCard } from 'lucide-react'
+import { Home, ShoppingCart, Package, Users, MoreHorizontal, X, FileText, BarChart3, Settings, Wallet, ClipboardList, Truck, MessageCircle, Star, Upload, UserCog, Store, CreditCard, Sun, Moon } from 'lucide-react'
+import { useTheme } from '../contexts/ThemeContext'
 import './MobileNav.css'
 
 // Role-specific navigation configurations
@@ -88,10 +89,13 @@ const getNavConfig = (role) => {
     return ROLE_NAV_CONFIGS[normalizedRole] || ROLE_NAV_CONFIGS.owner
 }
 
-export default function MobileNav({ currentPage, setCurrentPage }) {
+export default function MobileNav({ currentPage, setCurrentPage, userRole: userRoleProp }) {
     const [showMore, setShowMore] = useState(false)
     const [isMobile, setIsMobile] = useState(false)
-    const userRole = localStorage.getItem('kadai_user_role') || 'owner'
+    // Prefer the role passed from App (updates immediately on login/role change);
+    // fall back to localStorage for safety.
+    const userRole = userRoleProp || localStorage.getItem('kadai_user_role') || 'owner'
+    const { theme, toggleTheme } = useTheme()
 
     useEffect(() => {
         const checkMobile = () => {
@@ -153,13 +157,28 @@ export default function MobileNav({ currentPage, setCurrentPage }) {
                     <div className="more-menu" onClick={(e) => e.stopPropagation()}>
                         <div className="more-menu-header">
                             <h3>More Options</h3>
-                            <button
-                                className="close-btn"
-                                onClick={() => setShowMore(false)}
-                                aria-label="Close menu"
-                            >
-                                <X size={20} />
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button
+                                    className="theme-toggle-mobile"
+                                    onClick={toggleTheme}
+                                    aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                                    style={{
+                                        width: 36, height: 36, borderRadius: 8,
+                                        background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)',
+                                        color: 'var(--text-secondary)', display: 'flex', alignItems: 'center',
+                                        justifyContent: 'center', cursor: 'pointer'
+                                    }}
+                                >
+                                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                                </button>
+                                <button
+                                    className="close-btn"
+                                    onClick={() => setShowMore(false)}
+                                    aria-label="Close menu"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
                         </div>
                         <div className="more-menu-grid">
                             {moreItems.map((item) => (

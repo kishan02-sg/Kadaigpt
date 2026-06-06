@@ -95,13 +95,30 @@ class OfflineSyncService {
         const results = { success: 0, failed: 0 }
         const remaining = []
 
+        // Use the CURRENT auth token at sync time. The token stored when the
+        // request was queued may be missing or expired, which would 401 every
+        // replayed request. Inject a fresh Authorization header here.
+        const token = localStorage.getItem('kadai_token')
+
         for (const item of queue) {
             try {
+                const headers = { ...(item.headers || {}) }
+                if (token) headers['Authorization'] = `Bearer ${token}`
+
                 const response = await fetch(item.url, {
                     method: item.method,
-                    headers: item.headers,
+                    headers,
                     body: item.body
                 })
+
+                if (response.status === 401) {
+                    // Not authenticated (logged out / token revoked) — keep the item
+                    // queued so it can sync after the user logs back in.
+                    remaining.push(item)
+                    results.failed++
+                    console.warn(`[Offline] 401 on ${item.url} — will retry after re-login`)
+                    continue
+                }
 
                 if (response.ok) {
                     results.success++
@@ -139,6 +156,69 @@ class OfflineSyncService {
 
     clearQueue() {
         localStorage.removeItem(SYNC_QUEUE_KEY)
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Offline Bill Queue (High-Priority for Kirana stores)
+    // ═══════════════════════════════════════════════════════════
+
+    /**
+     * Queue a bill for later sync when offline
+     * Saves the full bill data locally so it appears in the bills list
+     */
+    queueBill(billData) {
+        const offlineBill = {
+            ...billData,
+            id: `offline_${Date.now()}`,
+            bill_number: `OFF-${Date.now().toString(36).toUpperCase()}`,
+            created_at: new Date().toISOString(),
+            status: 'pending_sync',
+            is_offline: true
+        }
+
+        // Save to offline bills list
+        const bills = this.getOfflineBills()
+        bills.push(offlineBill)
+        localStorage.setItem('kadaigpt_offline_bills', JSON.stringify(bills))
+
+        // Also queue the API call for sync
+        this.addToQueue({
+            method: 'POST',
+            url: '/api/v1/bills/',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(billData),
+            type: 'bill',
+            offlineBillId: offlineBill.id
+        })
+
+        console.log(`[Offline] Bill queued: ${offlineBill.bill_number}`)
+        return offlineBill
+    }
+
+    /**
+     * Get all bills saved while offline
+     */
+    getOfflineBills() {
+        try {
+            return JSON.parse(localStorage.getItem('kadaigpt_offline_bills') || '[]')
+        } catch {
+            return []
+        }
+    }
+
+    /**
+     * Remove a synced bill from offline storage
+     */
+    removeOfflineBill(offlineBillId) {
+        const bills = this.getOfflineBills().filter(b => b.id !== offlineBillId)
+        localStorage.setItem('kadaigpt_offline_bills', JSON.stringify(bills))
+    }
+
+    /**
+     * Clear all offline bills (call after successful full sync)
+     */
+    clearOfflineBills() {
+        localStorage.removeItem('kadaigpt_offline_bills')
     }
 
     // ═══════════════════════════════════════════════════════════
