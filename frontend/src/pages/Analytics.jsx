@@ -80,10 +80,10 @@ export default function Analytics({ addToast, setCurrentPage }) {
     const topProducts = analytics.topProducts || []
 
     const kpis = [
-        { label: 'Total Revenue', value: `₹${totalSales.toLocaleString()}`, change: salesChange, icon: IndianRupee, positive: salesChange >= 0 },
-        { label: 'Total Orders', value: totalBills, change: Math.abs(salesChange * 0.7).toFixed(1), icon: ShoppingBag, positive: true },
-        { label: 'Peak Day', value: predictions.peakDay || 'N/A', change: 0, icon: Calendar, positive: true },
-        { label: 'Avg Order Value', value: `₹${avgBillValue.toFixed(0)}`, change: 3.2, icon: TrendingUp, positive: true },
+        { label: t('analytics.totalRevenue', 'Total Revenue'), value: `₹${totalSales.toLocaleString()}`, change: salesChange, icon: IndianRupee, positive: salesChange >= 0 },
+        { label: t('analytics.totalOrders', 'Total Orders'), value: totalBills, change: Math.abs(salesChange * 0.7).toFixed(1), icon: ShoppingBag, positive: true },
+        { label: t('analytics.peakDay', 'Peak Day'), value: predictions.peakDay || 'N/A', change: 0, icon: Calendar, positive: true },
+        { label: t('analytics.avgOrderValue', 'Avg Order Value'), value: `₹${avgBillValue.toFixed(0)}`, change: 3.2, icon: TrendingUp, positive: true },
     ]
 
     const aiInsights = [
@@ -99,8 +99,8 @@ export default function Analytics({ addToast, setCurrentPage }) {
         <div className="analytics-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">📊 Analytics</h1>
-                    <p className="page-subtitle">AI-powered business insights</p>
+                    <h1 className="page-title">📊 {t('analytics.title', 'Analytics')}</h1>
+                    <p className="page-subtitle">{t('analytics.subtitle', 'AI-powered business insights')}</p>
                 </div>
                 <div className="header-filters">
                     <div className="period-selector">
@@ -110,7 +110,7 @@ export default function Analytics({ addToast, setCurrentPage }) {
                                 className={`period-btn ${period === p ? 'active' : ''}`}
                                 onClick={() => setPeriod(p)}
                             >
-                                {p.charAt(0).toUpperCase() + p.slice(1)}
+                                {t('common.' + p, p.charAt(0).toUpperCase() + p.slice(1))}
                             </button>
                         ))}
                     </div>
