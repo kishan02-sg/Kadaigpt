@@ -490,6 +490,8 @@ export default function Login({ onLogin }) {
                       placeholder="Enter 6-digit code"
                       maxLength={6}
                       autoFocus
+                      autoComplete="one-time-code"
+                      inputMode="numeric"
                       style={{ fontSize: '1.5rem', letterSpacing: '8px', textAlign: 'center', fontWeight: 700 }}
                     />
                   </div>
@@ -502,6 +504,8 @@ export default function Login({ onLogin }) {
                       onChange={e => setNewPassword(e.target.value)}
                       placeholder="At least 8 characters, with a letter and a number"
                       minLength={8}
+                      autoComplete="new-password"
+                      name="new-reset-password"
                     />
                   </div>
                   <button
