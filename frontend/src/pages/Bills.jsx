@@ -550,6 +550,14 @@ export default function Bills({ addToast, setCurrentPage }) {
         .stat-mini svg { color: var(--primary-400); }
         .stat-mini-value { font-size: 1.25rem; font-weight: 700; display: block; }
         .stat-mini-label { font-size: 0.75rem; color: var(--text-tertiary); }
+        /* Mobile: stack each stat compactly so all three fit without overflowing */
+        @media (max-width: 768px) {
+          .stats-bar { gap: 8px; }
+          .stat-mini { flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; min-width: 0; }
+          .stat-mini svg { width: 18px; height: 18px; }
+          .stat-mini-value { font-size: 1rem; }
+          .stat-mini-label { font-size: 0.65rem; line-height: 1.2; }
+        }
 
         .search-bar { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
         .search-input { flex: 1; }

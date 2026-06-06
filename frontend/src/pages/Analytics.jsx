@@ -304,6 +304,18 @@ export default function Analytics({ addToast, setCurrentPage }) {
         .kpi-change.positive { color: var(--success); }
         .kpi-change.negative { color: var(--error); }
 
+        /* Mobile: stack the KPI card so the label has full width and doesn't
+           wrap into 3 cramped lines next to the icon. */
+        @media (max-width: 768px) {
+          .kpi-card { flex-direction: column; align-items: flex-start; gap: 8px; padding: 14px; }
+          .kpi-icon { width: 40px; height: 40px; }
+          .kpi-icon svg { width: 20px; height: 20px; }
+          .kpi-content { width: 100%; }
+          .kpi-value { font-size: 1.3rem; }
+          .kpi-label { font-size: 0.72rem; line-height: 1.25; }
+          .kpi-change { top: 12px; right: 12px; font-size: 0.72rem; }
+        }
+
         .analytics-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; margin-bottom: 24px; }
         @media (max-width: 1024px) { .analytics-grid { grid-template-columns: 1fr; } }
 
