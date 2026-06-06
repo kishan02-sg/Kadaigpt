@@ -180,10 +180,19 @@ class SecurityASGIMiddleware:
         
         # Rate limiting (skip health/docs)
         if not path.startswith(("/api/ping", "/api/health", "/api/docs", "/api/redoc", "/api/openapi")):
-            # Get client IP from scope
-            client_addr = scope.get("client")
-            client_ip = client_addr[0] if client_addr else "unknown"
-            
+            # Get the REAL client IP. On Vercel/proxies, scope["client"] is the
+            # shared proxy address — using it would put every user in ONE rate-limit
+            # bucket, so one noisy client (or load test) throttles everyone. Prefer
+            # the first hop in X-Forwarded-For.
+            client_ip = "unknown"
+            headers = dict(scope.get("headers") or [])
+            xff = headers.get(b"x-forwarded-for")
+            if xff:
+                client_ip = xff.decode().split(",")[0].strip()
+            else:
+                client_addr = scope.get("client")
+                client_ip = client_addr[0] if client_addr else "unknown"
+
             limit_type = get_rate_limit_type(path)
             limits = RATE_LIMITS.get(limit_type, RATE_LIMITS['api'])
             allowed, remaining = rate_limiter.check_rate_limit(
