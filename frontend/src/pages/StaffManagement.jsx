@@ -98,7 +98,7 @@ export default function StaffManagement({ addToast }) {
             <div className="page-header">
                 <div>
                     <h1><Users size={28} /> Staff Management</h1>
-                    <p>Create staff accounts with unique login IDs</p>
+                    <p className="page-subtitle">Create staff accounts with unique login IDs</p>
                 </div>
                 <button className="add-btn" onClick={() => { setShowAddModal(true); setCreatedStaff(null) }}>
                     <UserPlus size={18} />

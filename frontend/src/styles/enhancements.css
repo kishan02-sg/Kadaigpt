@@ -1334,7 +1334,10 @@
     }
 
     .search-bar {
-        flex-direction: column;
+        /* Keep the search icon + input on one row. Stacking them (column) made a
+           tall ~100px box with the icon floating above the placeholder. */
+        flex-direction: row;
+        align-items: center;
     }
 
     .filter-chips {
