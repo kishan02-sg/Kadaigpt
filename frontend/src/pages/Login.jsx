@@ -309,7 +309,7 @@ export default function Login({ onLogin }) {
                     value={form.password}
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     required
-                    minLength={6}
+                    minLength={isLogin ? undefined : 8}
                   />
                   <button
                     type="button"
@@ -322,7 +322,7 @@ export default function Login({ onLogin }) {
                   </button>
                 </div>
                 {!isLogin && (
-                  <span className="password-hint">Minimum 6 characters</span>
+                  <span className="password-hint">At least 8 characters, with a letter and a number</span>
                 )}
               </div>
 
@@ -501,13 +501,13 @@ export default function Login({ onLogin }) {
                       className="form-input"
                       value={newPassword}
                       onChange={e => setNewPassword(e.target.value)}
-                      placeholder="Minimum 6 characters"
-                      minLength={6}
+                      placeholder="At least 8 characters, with a letter and a number"
+                      minLength={8}
                     />
                   </div>
                   <button
                     className="btn btn-primary w-full"
-                    disabled={forgotLoading || otpCode.length < 4 || newPassword.length < 6}
+                    disabled={forgotLoading || otpCode.length < 4 || newPassword.length < 8}
                     onClick={async () => {
                       setForgotLoading(true); setForgotError('');
                       try {

@@ -349,8 +349,8 @@ export default function Settings({ addToast }) {
                                 type="password"
                                 className="form-input"
                                 id="new-password"
-                                placeholder="Min 6 characters"
-                                minLength={6}
+                                placeholder="At least 8 characters, with a letter and a number"
+                                minLength={8}
                             />
                         </div>
                         <div className="form-group">
@@ -360,7 +360,7 @@ export default function Settings({ addToast }) {
                                 className="form-input"
                                 id="confirm-password"
                                 placeholder="Re-enter new password"
-                                minLength={6}
+                                minLength={8}
                             />
                         </div>
                         <button className="btn btn-primary" onClick={async () => {
@@ -370,8 +370,8 @@ export default function Settings({ addToast }) {
                             if (!currentPw || !newPw) {
                                 addToast('Please fill in all fields', 'error'); return
                             }
-                            if (newPw.length < 6) {
-                                addToast('New password must be at least 6 characters', 'error'); return
+                            if (newPw.length < 8 || !/[A-Za-z]/.test(newPw) || !/\d/.test(newPw)) {
+                                addToast('New password must be at least 8 characters and include a letter and a number', 'error'); return
                             }
                             if (newPw !== confirmPw) {
                                 addToast('New passwords do not match', 'error'); return
