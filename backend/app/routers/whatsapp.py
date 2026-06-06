@@ -16,6 +16,7 @@ import httpx
 from app.database import get_db
 from app.config import settings
 from app.services.whatsapp_bot import whatsapp_bot
+from app.routers.auth import get_current_active_user
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,89 @@ class WelcomeMessageRequest(BaseModel):
     """Request to send welcome message"""
     phone: str
     user_name: str
+
+
+class WhatsAppConfigUpdate(BaseModel):
+    """Per-store WhatsApp connection config (secrets are write-only)."""
+    provider: Optional[str] = None          # 'cloud' | 'evolution' | '' (disconnect)
+    cloud_token: Optional[str] = None
+    cloud_phone_id: Optional[str] = None
+    evolution_url: Optional[str] = None
+    evolution_key: Optional[str] = None
+    session: Optional[str] = None
+    number: Optional[str] = None
+
+
+# ==================== PER-STORE CONFIG ====================
+
+@router.get("/config")
+async def get_wa_config(current_user=Depends(get_current_active_user),
+                        db: AsyncSession = Depends(get_db)):
+    """Return the current store's WhatsApp config (secrets masked)."""
+    from app.models import Store
+    from sqlalchemy import select
+    store = (await db.execute(select(Store).where(Store.id == current_user.store_id))).scalar_one_or_none()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+    base = (getattr(settings, "API_BASE_URL", None) or "https://kadaigpt-main.vercel.app").rstrip("/")
+    return {
+        "provider": store.wa_provider,
+        "connected": bool(store.wa_connected),
+        "number": store.wa_number,
+        "cloud_phone_id": store.wa_cloud_phone_id,
+        "cloud_token_set": bool(store.wa_cloud_token_enc),
+        "evolution_url": store.wa_evolution_url,
+        "evolution_key_set": bool(store.wa_evolution_key_enc),
+        "session": store.wa_session,
+        "webhook_url": f"{base}/api/v1/whatsapp/webhook",
+        "verify_token": settings.WHATSAPP_VERIFY_TOKEN,
+    }
+
+
+@router.put("/config")
+async def update_wa_config(
+    payload: WhatsAppConfigUpdate,
+    current_user=Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save the current store's WhatsApp connection config (encrypts secrets)."""
+    from app.models import Store
+    from app.utils.encryption import data_encryptor
+    from sqlalchemy import select
+    store = (await db.execute(select(Store).where(Store.id == current_user.store_id))).scalar_one_or_none()
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+
+    provider = (payload.provider or "").strip().lower() or None
+    if provider not in (None, "cloud", "evolution"):
+        raise HTTPException(status_code=400, detail="provider must be 'cloud', 'evolution', or empty")
+
+    store.wa_provider = provider
+    if payload.number is not None:
+        store.wa_number = payload.number.strip() or None
+
+    if provider == "cloud":
+        if payload.cloud_token:
+            store.wa_cloud_token_enc = data_encryptor.encrypt(payload.cloud_token.strip())
+        if payload.cloud_phone_id is not None:
+            store.wa_cloud_phone_id = payload.cloud_phone_id.strip() or None
+        # Cloud is "connected" once token + phone id are present
+        store.wa_connected = bool(store.wa_cloud_token_enc and store.wa_cloud_phone_id)
+    elif provider == "evolution":
+        if payload.evolution_url is not None:
+            store.wa_evolution_url = payload.evolution_url.strip() or None
+        if payload.evolution_key:
+            store.wa_evolution_key_enc = data_encryptor.encrypt(payload.evolution_key.strip())
+        if payload.session is not None:
+            store.wa_session = payload.session.strip() or None
+        # Evolution becomes connected after QR scan (session WORKING); start false
+        store.wa_connected = bool(store.wa_connected and store.wa_evolution_url)
+    else:
+        # disconnect
+        store.wa_connected = False
+
+    await db.commit()
+    return {"success": True, "provider": store.wa_provider, "connected": bool(store.wa_connected)}
 
 
 # ==================== WAHA WEBHOOK ====================

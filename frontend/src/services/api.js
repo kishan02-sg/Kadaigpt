@@ -898,6 +898,15 @@ class ApiService {
         })
     }
 
+    // Per-store storefront-bot connection config
+    async getWaConfig() {
+        return this.request('/whatsapp/config')
+    }
+
+    async saveWaConfig(payload) {
+        return this.request('/whatsapp/config', { method: 'PUT', body: JSON.stringify(payload) })
+    }
+
     // Send via the backend (auto-send when a provider is configured); if the
     // backend isn't configured it returns a wa.me link which we open instead.
     // Always resolves — never throws — so callers don't need try/catch.
