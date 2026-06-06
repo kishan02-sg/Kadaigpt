@@ -6,19 +6,26 @@ Permission checks for API endpoints
 from fastapi import HTTPException, status, Depends
 from app.constants.roles import UserRole, ROLE_LEVELS
 from app.models import User
-from app.routers.auth import get_current_active_user
+
+# NOTE: get_current_active_user is imported lazily inside each factory below.
+# Importing it at module top creates a circular import:
+#   rbac -> routers.auth -> routers/__init__ -> products -> rbac
+# The lazy import is resolved at route-definition time, by which point
+# routers.auth (which imports none of products/rbac) loads cleanly.
 
 
 def require_role(*allowed_roles: UserRole):
     """
     Dependency that checks if current user has one of the allowed roles.
-    
+
     Usage:
         @router.get("/analytics")
         async def get_analytics(
             current_user: User = Depends(require_role(UserRole.OWNER, UserRole.MANAGER))
         ):
     """
+    from app.routers.auth import get_current_active_user
+
     async def _check_role(current_user: User = Depends(get_current_active_user)):
         if current_user.role not in allowed_roles:
             raise HTTPException(
@@ -39,6 +46,8 @@ def require_min_role(min_role: UserRole):
             current_user: User = Depends(require_min_role(UserRole.MANAGER))
         ):
     """
+    from app.routers.auth import get_current_active_user
+
     async def _check_min_role(current_user: User = Depends(get_current_active_user)):
         user_level = ROLE_LEVELS.get(current_user.role, 0)
         required_level = ROLE_LEVELS.get(min_role, 0)

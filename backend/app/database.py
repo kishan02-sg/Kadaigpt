@@ -182,6 +182,11 @@ async def run_migrations():
             ALTER TABLE customers ADD COLUMN last_purchase TIMESTAMP;
         EXCEPTION WHEN duplicate_column THEN NULL;
         END $$;""",
+        # Add tokens_valid_after to users (JWT revocation support)
+        """DO $$ BEGIN
+            ALTER TABLE users ADD COLUMN tokens_valid_after TIMESTAMPTZ;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;""",
     ]
     try:
         async with engine.begin() as conn:

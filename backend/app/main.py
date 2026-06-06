@@ -216,7 +216,24 @@ class SecurityASGIMiddleware:
                     (b"x-xss-protection", b"1; mode=block"),
                     (b"referrer-policy", b"strict-origin-when-cross-origin"),
                     (b"permissions-policy", b"camera=(), microphone=(self), geolocation=()"),
+                    # Content Security Policy — baseline. 'unsafe-inline' is required by the
+                    # current React build (inline styles/Vite). Tighten with nonces later.
+                    (b"content-security-policy",
+                     b"default-src 'self'; "
+                     b"script-src 'self' 'unsafe-inline'; "
+                     b"style-src 'self' 'unsafe-inline'; "
+                     b"img-src 'self' data: blob:; "
+                     b"font-src 'self' data:; "
+                     b"connect-src 'self' https:; "
+                     b"frame-ancestors 'none'; "
+                     b"base-uri 'self'; "
+                     b"form-action 'self'"),
                 ]
+                # HSTS only over HTTPS / in production — avoids breaking local http dev.
+                if settings.app_env == "production" or settings.is_serverless:
+                    extra.append(
+                        (b"strict-transport-security", b"max-age=31536000; includeSubDomains")
+                    )
                 message["headers"] = list(message.get("headers", [])) + extra
             await send(message)
 
@@ -273,10 +290,22 @@ async def ping():
 
 
 @app.post("/api/setup-db")
-async def setup_database():
+async def setup_database(request: Request):
     """One-time endpoint to create all database tables in Supabase.
-    Call this once after first deployment to initialize the schema.
+
+    Protected: requires the X-Setup-Secret header to match the SECRET_KEY env var.
+    This prevents anonymous callers from triggering schema operations on the
+    public deployment. Call once after first deployment to initialize the schema.
     """
+    import hmac
+    provided = request.headers.get("X-Setup-Secret", "")
+    expected = settings.secret_key or ""
+    # Constant-time compare; reject if no real secret is configured.
+    if not expected or not hmac.compare_digest(provided, expected):
+        return JSONResponse(
+            status_code=401,
+            content={"status": "error", "message": "Unauthorized. Provide a valid X-Setup-Secret header."}
+        )
     try:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

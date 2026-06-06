@@ -75,11 +75,15 @@ class User(Base):
     # Status
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime(timezone=True))
-    
+
+    # Token revocation: JWTs issued before this timestamp are rejected.
+    # Bumped on logout / password change to invalidate all outstanding tokens.
+    tokens_valid_after = Column(DateTime(timezone=True), nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
     store = relationship("Store", back_populates="users")
     bills = relationship("Bill", back_populates="cashier")
@@ -484,3 +488,24 @@ class PurchaseOrder(Base):
     # Relationships
     store = relationship("Store")
     supplier = relationship("Supplier", back_populates="orders")
+
+
+class AuthSecurityState(Base):
+    """Cross-request persistence for auth security state.
+
+    Serverless (Vercel) containers are stateless, so in-memory dicts for login
+    lockout, password-reset tokens and OTPs evaporate on cold starts — which
+    silently defeats brute-force protection. This table persists that state.
+
+    kind: 'lockout' | 'reset_token' | 'otp'
+    key:  identifier for the kind (email/staff_id, reset token, phone-last10)
+    """
+    __tablename__ = "auth_security_state"
+
+    id = Column(Integer, primary_key=True, index=True)
+    kind = Column(String(20), index=True, nullable=False)
+    key = Column(String(255), index=True, nullable=False)
+    data = Column(JSON, default=dict)        # arbitrary payload (count, otp, user_id, ...)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

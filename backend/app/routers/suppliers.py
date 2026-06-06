@@ -13,7 +13,14 @@ import random
 
 from app.database import get_db
 from app.models import User, Store
+from app.constants.roles import UserRole
 from app.routers.auth import get_current_user
+from app.rbac import require_role
+
+# Supplier management is restricted to inventory-managing roles (not cashiers).
+require_supplier_manager = require_role(
+    UserRole.OWNER, UserRole.MANAGER, UserRole.INVENTORY_MANAGER
+)
 
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
 
@@ -297,7 +304,7 @@ async def get_suppliers(
 @router.post("", response_model=dict)
 async def create_supplier(
     supplier: SupplierCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_supplier_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new supplier (DB-backed)"""
@@ -360,7 +367,7 @@ async def get_supplier(
 async def update_supplier(
     supplier_id: int,
     supplier_update: SupplierUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_supplier_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """Update a supplier (DB-backed)"""
@@ -391,7 +398,7 @@ async def update_supplier(
 @router.delete("/{supplier_id}")
 async def delete_supplier(
     supplier_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_supplier_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """Soft-delete a supplier (DB-backed)"""
