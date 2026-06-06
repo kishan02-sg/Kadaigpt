@@ -279,7 +279,10 @@
     "orders": "Purchase Orders",
     "createOrder": "Create Order",
     "totalOrders": "Total Orders",
-    "pendingOrders": "Pending Orders"
+    "pendingOrders": "Pending Orders",
+    "totalSuppliers": "Total Suppliers",
+    "purchaseOrders": "Purchase Orders",
+    "payables": "Payables"
   },
   "staff": {
     "title": "Staff Management",
@@ -315,7 +318,9 @@
     "downloadReport": "Download Report",
     "gstr1": "GSTR-1",
     "gstr3b": "GSTR-3B",
-    "noGstData": "No GST data available for this period"
+    "noGstData": "No GST data available for this period",
+    "taxableAmount": "Taxable Amount",
+    "totalGst": "Total GST"
   },
   "expenses": {
     "title": "Expense Tracker",
@@ -346,7 +351,9 @@
     "paymentBreakdown": "Payment Breakdown",
     "noSalesToday": "No sales recorded today",
     "generateReport": "Generate Report",
-    "printReport": "Print Report"
+    "printReport": "Print Report",
+    "customers": "Customers",
+    "netProfit": "Net Profit"
   },
   "subscription": {
     "title": "Subscription Plans",
@@ -389,7 +396,11 @@
     "disconnected": "Disconnected",
     "setupRequired": "Setup Required",
     "setupInstructions": "Set EVOLUTION_API_URL and EVOLUTION_API_KEY in your Vercel environment variables to enable WhatsApp integration.",
-    "viewDocs": "View Setup Docs"
+    "viewDocs": "View Setup Docs",
+    "totalOutstanding": "Total Outstanding",
+    "messagesSent": "Messages Sent",
+    "totalCustomers": "Total Customers",
+    "withPendingDues": "With Pending Dues"
   },
   "bulkOps": {
     "title": "Import/Export",

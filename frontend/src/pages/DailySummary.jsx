@@ -291,7 +291,7 @@ export default function DailySummary({ addToast }) {
                 <div className="stat-card sales">
                     <div className="stat-icon"><IndianRupee size={24} /></div>
                     <div className="stat-info">
-                        <span className="label">Total Sales</span>
+                        <span className="label">{t('dailySummary.totalSales', 'Total Sales')}</span>
                         <span className="value">₹{summary.sales.total.toLocaleString()}</span>
                         <span className={`change ${summary.sales.change >= 0 ? 'positive' : 'negative'}`}>
                             {summary.sales.change >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
@@ -302,7 +302,7 @@ export default function DailySummary({ addToast }) {
                 <div className="stat-card">
                     <div className="stat-icon"><ShoppingCart size={24} /></div>
                     <div className="stat-info">
-                        <span className="label">Total Bills</span>
+                        <span className="label">{t('dailySummary.totalBills', 'Total Bills')}</span>
                         <span className="value">{summary.sales.billCount}</span>
                         <span className="sub">Avg: ₹{summary.sales.avgBillValue}</span>
                     </div>
@@ -310,7 +310,7 @@ export default function DailySummary({ addToast }) {
                 <div className="stat-card">
                     <div className="stat-icon"><Users size={24} /></div>
                     <div className="stat-info">
-                        <span className="label">Customers</span>
+                        <span className="label">{t('dailySummary.customers', 'Customers')}</span>
                         <span className="value">{summary.customers.total}</span>
                         <span className="sub">{summary.customers.new} new today</span>
                     </div>
@@ -318,7 +318,7 @@ export default function DailySummary({ addToast }) {
                 <div className="stat-card profit">
                     <div className="stat-icon"><Star size={24} /></div>
                     <div className="stat-info">
-                        <span className="label">Net Profit</span>
+                        <span className="label">{t('dailySummary.netProfit', 'Net Profit')}</span>
                         <span className="value">₹{summary.profit.net.toLocaleString()}</span>
                         <span className="sub">{summary.profit.margin}% margin</span>
                     </div>

@@ -279,7 +279,10 @@
     "orders": "खरीद ऑर्डर",
     "createOrder": "ऑर्डर बनाएं",
     "totalOrders": "कुल ऑर्डर",
-    "pendingOrders": "लंबित ऑर्डर"
+    "pendingOrders": "लंबित आदेश",
+    "totalSuppliers": "कुल आपूर्तिकर्ता",
+    "purchaseOrders": "खरीद आदेश",
+    "payables": "देय राशि"
   },
   "staff": {
     "title": "स्टाफ प्रबंधन",
@@ -315,7 +318,9 @@
     "downloadReport": "रिपोर्ट डाउनलोड करें",
     "gstr1": "GSTR-1",
     "gstr3b": "GSTR-3B",
-    "noGstData": "इस अवधि के लिए कोई GST डेटा नहीं"
+    "noGstData": "इस अवधि के लिए कोई GST डेटा नहीं",
+    "taxableAmount": "कर योग्य राशि",
+    "totalGst": "कुल जीएसटी"
   },
   "expenses": {
     "title": "खर्च ट्रैकर",
@@ -346,7 +351,9 @@
     "paymentBreakdown": "भुगतान विश्लेषण",
     "noSalesToday": "आज कोई बिक्री दर्ज नहीं",
     "generateReport": "रिपोर्ट बनाएं",
-    "printReport": "रिपोर्ट प्रिंट करें"
+    "printReport": "रिपोर्ट प्रिंट करें",
+    "customers": "ग्राहक",
+    "netProfit": "शुद्ध लाभ"
   },
   "subscription": {
     "title": "सब्सक्रिप्शन प्लान",
@@ -389,7 +396,11 @@
     "disconnected": "डिस्कनेक्टेड",
     "setupRequired": "सेटअप आवश्यक",
     "setupInstructions": "WhatsApp एकीकरण सक्षम करने के लिए अपने Vercel एनवायरनमेंट वेरिएबल्स में EVOLUTION_API_URL और EVOLUTION_API_KEY सेट करें।",
-    "viewDocs": "सेटअप डॉक्स देखें"
+    "viewDocs": "सेटअप डॉक्स देखें",
+    "totalOutstanding": "कुल बकाया",
+    "messagesSent": "भेजे गए संदेश",
+    "totalCustomers": "कुल ग्राहक",
+    "withPendingDues": "बकाया वाले"
   },
   "bulkOps": {
     "title": "आयात/निर्यात",

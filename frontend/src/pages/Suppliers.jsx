@@ -301,28 +301,28 @@ export default function Suppliers({ addToast }) {
                     <Truck size={24} />
                     <div>
                         <span className="value">{totalSuppliers}</span>
-                        <span className="label">Total Suppliers</span>
+                        <span className="label">{t('suppliers.totalSuppliers', 'Total Suppliers')}</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <Package size={24} />
                     <div>
                         <span className="value">{orders.length}</span>
-                        <span className="label">Purchase Orders</span>
+                        <span className="label">{t('suppliers.purchaseOrders', 'Purchase Orders')}</span>
                     </div>
                 </div>
                 <div className="stat-card warning">
                     <Clock size={24} />
                     <div>
                         <span className="value">{pendingOrders}</span>
-                        <span className="label">Pending Orders</span>
+                        <span className="label">{t('suppliers.pendingOrders', 'Pending Orders')}</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <TrendingUp size={24} />
                     <div>
                         <span className="value">₹{(totalPending || 0).toLocaleString()}</span>
-                        <span className="label">Payables</span>
+                        <span className="label">{t('suppliers.payables', 'Payables')}</span>
                     </div>
                 </div>
             </div>

@@ -279,7 +279,10 @@
     "orders": "ಖರೀದಿ ಆರ್ಡರ್‌ಗಳು",
     "createOrder": "ಆರ್ಡರ್ ರಚಿಸಿ",
     "totalOrders": "ಒಟ್ಟು ಆರ್ಡರ್‌ಗಳು",
-    "pendingOrders": "ಬಾಕಿ ಆರ್ಡರ್‌ಗಳು"
+    "pendingOrders": "ಬಾಕಿ ಆದೇಶಗಳು",
+    "totalSuppliers": "ಒಟ್ಟು ಪೂರೈಕೆದಾರರು",
+    "purchaseOrders": "ಖರೀದಿ ಆದೇಶಗಳು",
+    "payables": "ಪಾವತಿಸಬೇಕಾದವು"
   },
   "staff": {
     "title": "ಸಿಬ್ಬಂದಿ ನಿರ್ವಹಣೆ",
@@ -315,7 +318,9 @@
     "downloadReport": "ವರದಿ ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
     "gstr1": "GSTR-1",
     "gstr3b": "GSTR-3B",
-    "noGstData": "ಈ ಅವಧಿಗೆ GST ಡೇಟಾ ಇಲ್ಲ"
+    "noGstData": "ಈ ಅವಧಿಗೆ GST ಡೇಟಾ ಇಲ್ಲ",
+    "taxableAmount": "ತೆರಿಗೆಗೆ ಒಳಪಡುವ ಮೊತ್ತ",
+    "totalGst": "ಒಟ್ಟು ಜಿಎಸ್‌ಟಿ"
   },
   "expenses": {
     "title": "ಖರ್ಚು ಟ್ರ್ಯಾಕರ್",
@@ -346,7 +351,9 @@
     "paymentBreakdown": "ಪಾವತಿ ವಿಭಜನೆ",
     "noSalesToday": "ಇಂದು ಮಾರಾಟ ದಾಖಲಾಗಿಲ್ಲ",
     "generateReport": "ವರದಿ ರಚಿಸಿ",
-    "printReport": "ವರದಿ ಮುದ್ರಿಸಿ"
+    "printReport": "ವರದಿ ಮುದ್ರಿಸಿ",
+    "customers": "ಗ್ರಾಹಕರು",
+    "netProfit": "ನಿವ್ವಳ ಲಾಭ"
   },
   "subscription": {
     "title": "ಚಂದಾ ಯೋಜನೆಗಳು",
@@ -389,7 +396,11 @@
     "disconnected": "ಸಂಪರ್ಕ ಕಡಿತ",
     "setupRequired": "ಸೆಟಪ್ ಅಗತ್ಯ",
     "setupInstructions": "WhatsApp ಏಕೀಕರಣವನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಲು ನಿಮ್ಮ Vercel ಪರಿಸರ ಅಸ್ಥಿರಗಳಲ್ಲಿ EVOLUTION_API_URL ಮತ್ತು EVOLUTION_API_KEY ಹೊಂದಿಸಿ.",
-    "viewDocs": "ಸೆಟಪ್ ಡಾಕ್ಸ್ ನೋಡಿ"
+    "viewDocs": "ಸೆಟಪ್ ಡಾಕ್ಸ್ ನೋಡಿ",
+    "totalOutstanding": "ಒಟ್ಟು ಬಾಕಿ",
+    "messagesSent": "ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳು",
+    "totalCustomers": "ಒಟ್ಟು ಗ್ರಾಹಕರು",
+    "withPendingDues": "ಬಾಕಿ ಇರುವವರು"
   },
   "bulkOps": {
     "title": "ಆಮದು/ರಫ್ತು",

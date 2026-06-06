@@ -279,7 +279,10 @@
     "orders": "కొనుగోలు ఆర్డర్లు",
     "createOrder": "ఆర్డర్ సృష్టించండి",
     "totalOrders": "మొత్తం ఆర్డర్లు",
-    "pendingOrders": "పెండింగ్ ఆర్డర్లు"
+    "pendingOrders": "పెండింగ్ ఆర్డర్లు",
+    "totalSuppliers": "మొత్తం సరఫరాదారులు",
+    "purchaseOrders": "కొనుగోలు ఆర్డర్లు",
+    "payables": "చెల్లించవలసినవి"
   },
   "staff": {
     "title": "సిబ్బంది నిర్వహణ",
@@ -315,7 +318,9 @@
     "downloadReport": "రిపోర్టు డౌన్‌లోడ్ చేయండి",
     "gstr1": "GSTR-1",
     "gstr3b": "GSTR-3B",
-    "noGstData": "ఈ కాలానికి GST డేటా లేదు"
+    "noGstData": "ఈ కాలానికి GST డేటా లేదు",
+    "taxableAmount": "పన్ను విధించదగిన మొత్తం",
+    "totalGst": "మొత్తం జీఎస్‌టీ"
   },
   "expenses": {
     "title": "ఖర్చు ట్రాకర్",
@@ -346,7 +351,9 @@
     "paymentBreakdown": "చెల్లింపు విభజన",
     "noSalesToday": "ఈరోజు అమ్మకాలు నమోదు కాలేదు",
     "generateReport": "రిపోర్టు సృష్టించండి",
-    "printReport": "రిపోర్టు ప్రింట్ చేయండి"
+    "printReport": "రిపోర్టు ప్రింట్ చేయండి",
+    "customers": "కస్టమర్లు",
+    "netProfit": "నికర లాభం"
   },
   "subscription": {
     "title": "సబ్‌స్క్రిప్షన్ ప్లాన్లు",
@@ -389,7 +396,11 @@
     "disconnected": "డిస్‌కనెక్ట్ అయింది",
     "setupRequired": "సెటప్ అవసరం",
     "setupInstructions": "WhatsApp ఇంటిగ్రేషన్ ఎనేబుల్ చేయడానికి మీ Vercel ఎన్విరాన్మెంట్ వేరియబుల్స్‌లో EVOLUTION_API_URL మరియు EVOLUTION_API_KEY సెట్ చేయండి.",
-    "viewDocs": "సెటప్ డాక్స్ చూడండి"
+    "viewDocs": "సెటప్ డాక్స్ చూడండి",
+    "totalOutstanding": "మొత్తం బకాయి",
+    "messagesSent": "పంపిన సందేశాలు",
+    "totalCustomers": "మొత్తం కస్టమర్లు",
+    "withPendingDues": "పెండింగ్ ఉన్నవారు"
   },
   "bulkOps": {
     "title": "దిగుమతి/ఎగుమతి",

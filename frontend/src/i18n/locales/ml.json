@@ -279,7 +279,10 @@
     "orders": "വാങ്ങൽ ഓർഡറുകൾ",
     "createOrder": "ഓർഡർ സൃഷ്ടിക്കുക",
     "totalOrders": "ആകെ ഓർഡറുകൾ",
-    "pendingOrders": "ബാക്കി ഓർഡറുകൾ"
+    "pendingOrders": "തീർപ്പാക്കാത്ത ഓർഡറുകൾ",
+    "totalSuppliers": "മൊത്തം വിതരണക്കാർ",
+    "purchaseOrders": "വാങ്ങൽ ഓർഡറുകൾ",
+    "payables": "നൽകാനുള്ളവ"
   },
   "staff": {
     "title": "ജീവനക്കാരുടെ മാനേജ്‌മെന്റ്",
@@ -309,13 +312,15 @@
     "cgst": "CGST",
     "sgst": "SGST",
     "igst": "IGST",
-    "totalSales": "ആകെ വിൽപ്പന",
+    "totalSales": "മൊത്തം വിൽപ്പന",
     "taxableValue": "നികുതി വിധേയ മൂല്യം",
     "selectPeriod": "കാലയളവ് തിരഞ്ഞെടുക്കുക",
     "downloadReport": "റിപ്പോർട്ട് ഡൗൺലോഡ് ചെയ്യുക",
     "gstr1": "GSTR-1",
     "gstr3b": "GSTR-3B",
-    "noGstData": "ഈ കാലയളവിൽ GST ഡാറ്റ ഇല്ല"
+    "noGstData": "ഈ കാലയളവിൽ GST ഡാറ്റ ഇല്ല",
+    "taxableAmount": "നികുതി ചുമത്താവുന്ന തുക",
+    "totalGst": "മൊത്തം ജിഎസ്ടി"
   },
   "expenses": {
     "title": "ചെലവ് ട്രാക്കർ",
@@ -346,7 +351,9 @@
     "paymentBreakdown": "പേയ്‌മെന്റ് വിശകലനം",
     "noSalesToday": "ഇന്ന് വിൽപ്പന രേഖപ്പെടുത്തിയിട്ടില്ല",
     "generateReport": "റിപ്പോർട്ട് സൃഷ്ടിക്കുക",
-    "printReport": "റിപ്പോർട്ട് പ്രിന്റ് ചെയ്യുക"
+    "printReport": "റിപ്പോർട്ട് പ്രിന്റ് ചെയ്യുക",
+    "customers": "ഉപഭോക്താക്കൾ",
+    "netProfit": "അറ്റ ലാഭം"
   },
   "subscription": {
     "title": "സബ്‌സ്ക്രിപ്ഷൻ പ്ലാനുകൾ",
@@ -389,7 +396,11 @@
     "disconnected": "വിച്ഛേദിച്ചു",
     "setupRequired": "സെറ്റപ്പ് ആവശ്യമാണ്",
     "setupInstructions": "WhatsApp ഇന്റഗ്രേഷൻ പ്രവർത്തനക്ഷമമാക്കാൻ നിങ്ങളുടെ Vercel എൻവയോൺമെന്റ് വേരിയബിളുകളിൽ EVOLUTION_API_URL-ഉം EVOLUTION_API_KEY-ഉം സെറ്റ് ചെയ്യുക.",
-    "viewDocs": "സെറ്റപ്പ് ഡോക്‌സ് കാണുക"
+    "viewDocs": "സെറ്റപ്പ് ഡോക്‌സ് കാണുക",
+    "totalOutstanding": "മൊത്തം കുടിശ്ശിക",
+    "messagesSent": "അയച്ച സന്ദേശങ്ങൾ",
+    "totalCustomers": "മൊത്തം ഉപഭോക്താക്കൾ",
+    "withPendingDues": "കുടിശ്ശിക ഉള്ളവർ"
   },
   "bulkOps": {
     "title": "ഇറക്കുമതി/കയറ്റുമതി",

@@ -150,28 +150,28 @@ export default function WhatsAppIntegration({ addToast }) {
                     <Users size={24} />
                     <div>
                         <span className="value">{stats.total}</span>
-                        <span className="label">Total Customers</span>
+                        <span className="label">{t('whatsapp.totalCustomers', 'Total Customers')}</span>
                     </div>
                 </div>
                 <div className="stat-card warning">
                     <AlertCircle size={24} />
                     <div>
                         <span className="value">{stats.withDues}</span>
-                        <span className="label">With Pending Dues</span>
+                        <span className="label">{t('whatsapp.withPendingDues', 'With Pending Dues')}</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <Clock size={24} />
                     <div>
                         <span className="value">₹{stats.totalDues.toLocaleString()}</span>
-                        <span className="label">Total Outstanding</span>
+                        <span className="label">{t('whatsapp.totalOutstanding', 'Total Outstanding')}</span>
                     </div>
                 </div>
                 <div className="stat-card highlight">
                     <CheckCheck size={24} />
                     <div>
                         <span className="value">{stats.messagesSent}</span>
-                        <span className="label">Messages Sent</span>
+                        <span className="label">{t('whatsapp.messagesSent', 'Messages Sent')}</span>
                     </div>
                 </div>
             </div>

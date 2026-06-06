@@ -279,7 +279,10 @@
     "orders": "கொள்முதல் ஆர்டர்கள்",
     "createOrder": "ஆர்டர் உருவாக்கு",
     "totalOrders": "மொத்த ஆர்டர்கள்",
-    "pendingOrders": "நிலுவை ஆர்டர்கள்"
+    "pendingOrders": "நிலுவை ஆர்டர்கள்",
+    "totalSuppliers": "மொத்த சப்ளையர்கள்",
+    "purchaseOrders": "கொள்முதல் ஆர்டர்கள்",
+    "payables": "செலுத்த வேண்டியவை"
   },
   "staff": {
     "title": "ஊழியர் மேலாண்மை",
@@ -315,7 +318,9 @@
     "downloadReport": "அறிக்கை பதிவிறக்கு",
     "gstr1": "GSTR-1",
     "gstr3b": "GSTR-3B",
-    "noGstData": "இந்த காலத்திற்கு GST தரவு இல்லை"
+    "noGstData": "இந்த காலத்திற்கு GST தரவு இல்லை",
+    "taxableAmount": "வரிவிதிக்கத்தக்க தொகை",
+    "totalGst": "மொத்த ஜிஎஸ்டி"
   },
   "expenses": {
     "title": "செலவு கண்காணிப்பு",
@@ -346,7 +351,9 @@
     "paymentBreakdown": "கட்டண பிரிவு",
     "noSalesToday": "இன்று விற்பனை பதிவு செய்யப்படவில்லை",
     "generateReport": "அறிக்கை உருவாக்கு",
-    "printReport": "அறிக்கை அச்சிடு"
+    "printReport": "அறிக்கை அச்சிடு",
+    "customers": "வாடிக்கையாளர்கள்",
+    "netProfit": "நிகர லாபம்"
   },
   "subscription": {
     "title": "சந்தா திட்டங்கள்",
@@ -389,7 +396,11 @@
     "disconnected": "துண்டிக்கப்பட்டது",
     "setupRequired": "அமைப்பு தேவை",
     "setupInstructions": "WhatsApp ஒருங்கிணைப்பை இயக்க உங்கள் Vercel சூழல் மாறிகளில் EVOLUTION_API_URL மற்றும் EVOLUTION_API_KEY அமைக்கவும்.",
-    "viewDocs": "அமைப்பு ஆவணங்களைக் காண்க"
+    "viewDocs": "அமைப்பு ஆவணங்களைக் காண்க",
+    "totalOutstanding": "மொத்த நிலுவை",
+    "messagesSent": "அனுப்பிய செய்திகள்",
+    "totalCustomers": "மொத்த வாடிக்கையாளர்கள்",
+    "withPendingDues": "நிலுவை உள்ளவர்கள்"
   },
   "bulkOps": {
     "title": "இறக்குமதி/ஏற்றுமதி",

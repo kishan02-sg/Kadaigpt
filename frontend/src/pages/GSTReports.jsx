@@ -356,21 +356,21 @@ export default function GSTReports({ addToast }) {
                     <IndianRupee size={24} />
                     <div>
                         <span className="value">₹{(gstData?.summary?.totalSales || 0).toLocaleString()}</span>
-                        <span className="label">Total Sales</span>
+                        <span className="label">{t('gst.totalSales', 'Total Sales')}</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <Receipt size={24} />
                     <div>
                         <span className="value">₹{(gstData?.summary?.taxableAmount || 0).toLocaleString()}</span>
-                        <span className="label">Taxable Amount</span>
+                        <span className="label">{t('gst.taxableAmount', 'Taxable Amount')}</span>
                     </div>
                 </div>
                 <div className="stat-card highlight">
                     <FileText size={24} />
                     <div>
                         <span className="value">₹{(gstData?.summary?.totalGST || 0).toLocaleString()}</span>
-                        <span className="label">Total GST</span>
+                        <span className="label">{t('gst.totalGst', 'Total GST')}</span>
                     </div>
                 </div>
                 <div className="stat-card">
