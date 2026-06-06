@@ -139,7 +139,7 @@ export default function WhatsAppIntegration({ addToast }) {
         <div className="whatsapp-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">💬 WhatsApp Business</h1>
+                    <h1 className="page-title">💬 {t('whatsapp.title', 'WhatsApp Business')}</h1>
                     <p className="page-subtitle">Send reminders and communicate with customers</p>
                 </div>
             </div>

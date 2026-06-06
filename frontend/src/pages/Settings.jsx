@@ -144,7 +144,7 @@ export default function Settings({ addToast }) {
     return (
         <div className="settings-page">
             <div className="page-header">
-                <h1 className="page-title">⚙️ Settings</h1>
+                <h1 className="page-title">⚙️ {t('settings.title', 'Settings')}</h1>
                 <p className="page-subtitle">Configure your store, printer, and preferences</p>
             </div>
 

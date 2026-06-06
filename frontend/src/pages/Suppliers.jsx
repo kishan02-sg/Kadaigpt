@@ -282,7 +282,7 @@ export default function Suppliers({ addToast }) {
         <div className="suppliers-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">🚚 Supplier Management</h1>
+                    <h1 className="page-title">🚚 {t('suppliers.title', 'Supplier Management')}</h1>
                     <p className="page-subtitle">Manage vendors and purchase orders</p>
                 </div>
                 <div className="header-actions">

@@ -224,7 +224,7 @@ export default function BulkOperations({ addToast }) {
         <div className="bulk-operations-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">📦 Bulk Operations</h1>
+                    <h1 className="page-title">📦 {t('bulkOps.title', 'Bulk Operations')}</h1>
                     <p className="page-subtitle">Import and export data in bulk</p>
                 </div>
             </div>

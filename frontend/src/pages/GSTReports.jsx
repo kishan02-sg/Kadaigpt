@@ -303,7 +303,7 @@ export default function GSTReports({ addToast }) {
         <div className="gst-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">🧾 GST Reports</h1>
+                    <h1 className="page-title">🧾 {t('gst.title', 'GST Reports')}</h1>
                     <p className="page-subtitle">Generate GSTR-1 and track tax compliance</p>
                 </div>
                 <div className="header-actions">

@@ -97,7 +97,7 @@ export default function StaffManagement({ addToast }) {
             {/* Header */}
             <div className="page-header">
                 <div>
-                    <h1><Users size={28} /> Staff Management</h1>
+                    <h1><Users size={28} /> {t('staff.title', 'Staff Management')}</h1>
                     <p className="page-subtitle">Create staff accounts with unique login IDs</p>
                 </div>
                 <button className="add-btn" onClick={() => { setShowAddModal(true); setCreatedStaff(null) }}>

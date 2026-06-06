@@ -136,7 +136,7 @@ export default function StoreManager({ addToast, setCurrentPage, onStoreChange }
         <div className="store-manager">
             <div className="page-header">
                 <div>
-                    <h1><Store size={28} /> My Stores</h1>
+                    <h1><Store size={28} /> {t('storeManager.title', 'My Stores')}</h1>
                     <p className="page-subtitle">Manage multiple store locations</p>
                 </div>
                 <button className="add-btn" onClick={() => setShowAddModal(true)}>

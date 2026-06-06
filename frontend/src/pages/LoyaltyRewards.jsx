@@ -166,7 +166,7 @@ export default function LoyaltyRewards({ addToast }) {
             <div className="loyalty-page">
                 <div className="page-header">
                     <div>
-                        <h1 className="page-title">🎁 Loyalty & Rewards</h1>
+                        <h1 className="page-title">🎁 {t('loyalty.title', 'Loyalty & Rewards')}</h1>
                         <p className="page-subtitle">Retain customers with points and rewards</p>
                     </div>
                 </div>
@@ -217,7 +217,7 @@ export default function LoyaltyRewards({ addToast }) {
         <div className="loyalty-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">🎁 Loyalty & Rewards</h1>
+                    <h1 className="page-title">🎁 {t('loyalty.title', 'Loyalty & Rewards')}</h1>
                     <p className="page-subtitle">Retain customers with points and rewards</p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
