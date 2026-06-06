@@ -163,8 +163,13 @@ export default function Dashboard({ addToast, setCurrentPage }) {
       .dash-header { flex-direction: column; gap: 12px; }
       .dash-time { width: 100%; justify-content: space-between; }
       .dash-stats { grid-template-columns: 1fr 1fr; }
-      .stat-card { padding: 14px; }
-      .stat-card strong { font-size: 1.2rem; }
+      .stat-card { padding: 12px; gap: 10px; align-items: flex-start; }
+      .stat-card svg:first-child { width: 38px; height: 38px; padding: 8px; }
+      .stat-card strong { font-size: 1.15rem; }
+      .stat-card span { font-size: 0.7rem; line-height: 1.2; }
+      /* The decorative trend arrow crowds the label on tiny cards (clipping
+         "Today's Sales" to "Today'"). Hide it on mobile so labels fit. */
+      .stat-card .trend { display: none; }
     }
   `
 
