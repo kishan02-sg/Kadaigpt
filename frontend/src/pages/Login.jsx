@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShoppingCart, Mail, Lock, User, ArrowRight, Loader2, Sparkles, Zap, Shield, Wifi, Eye, EyeOff, Square, CheckSquare, Building, Users } from 'lucide-react'
+import { ShoppingCart, Mail, Lock, User, ArrowRight, Loader2, Sparkles, Zap, Shield, Wifi, Eye, EyeOff, Square, CheckSquare, Building, Users, X } from 'lucide-react'
 import api from '../services/api'
+import LegalPages from './LegalPages'
 
 export default function Login({ onLogin }) {
   const { t } = useTranslation()
@@ -11,6 +12,7 @@ export default function Login({ onLogin }) {
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [legalView, setLegalView] = useState(null) // 'privacy' | 'terms' | null
   const [form, setForm] = useState({
     username: '',
     email: '',
@@ -342,9 +344,9 @@ export default function Login({ onLogin }) {
                   </button>
                   <span className="terms-label">
                     I agree to the{' '}
-                    <a href="#terms" onClick={(e) => e.preventDefault()}>Terms of Service</a>
+                    <a href="#terms" onClick={(e) => { e.preventDefault(); setLegalView('terms') }}>Terms of Service</a>
                     {' '}and{' '}
-                    <a href="#privacy" onClick={(e) => e.preventDefault()}>Privacy Policy</a>
+                    <a href="#privacy" onClick={(e) => { e.preventDefault(); setLegalView('privacy') }}>Privacy Policy</a>
                   </span>
                 </div>
               )}
@@ -387,12 +389,38 @@ export default function Login({ onLogin }) {
 
             {isLogin && (
               <p className="terms-text">
-                By continuing, you agree to our Terms of Service and Privacy Policy
+                By continuing, you agree to our{' '}
+                <a href="#terms" onClick={(e) => { e.preventDefault(); setLegalView('terms') }} style={{ color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}>Terms of Service</a>
+                {' '}and{' '}
+                <a href="#privacy" onClick={(e) => { e.preventDefault(); setLegalView('privacy') }} style={{ color: 'inherit', textDecoration: 'underline', cursor: 'pointer' }}>Privacy Policy</a>
               </p>
             )}
           </div>
         </div>
       </div>
+
+      {/* Terms / Privacy Modal — viewable before signing in */}
+      {legalView && (
+        <div
+          className="modal-overlay"
+          onClick={() => setLegalView(null)}
+          style={{ zIndex: 10001, position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: '24px 12px' }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: 'var(--bg-primary, #fff)', borderRadius: '16px', maxWidth: '840px', width: '100%', position: 'relative', boxShadow: '0 20px 60px rgba(0,0,0,0.3)' }}
+          >
+            <button
+              onClick={() => setLegalView(null)}
+              aria-label="Close"
+              style={{ position: 'absolute', top: '14px', right: '14px', zIndex: 1, width: 36, height: 36, borderRadius: 10, border: '1px solid var(--border-color, #e2e8f0)', background: 'var(--bg-secondary, #f8fafc)', color: 'var(--text-secondary, #475569)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              <X size={18} />
+            </button>
+            <LegalPages page={legalView} onBack={() => setLegalView(null)} />
+          </div>
+        </div>
+      )}
 
       {/* Forgot Password Modal — OTP-based */}
       {showForgotPassword && (

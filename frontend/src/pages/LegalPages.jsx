@@ -12,45 +12,47 @@ export default function LegalPages({ page = 'privacy', onBack }) {
 
     const toggle = (id) => setExpandedSection(expandedSection === id ? null : id)
 
+    // Titles use t(key, englishFallback): English by default, and automatically
+    // shown in the user's chosen language IF a translation exists for that key.
     const privacySections = [
         {
             id: 'collect',
-            title: 'हम क्या डेटा इकट्ठा करते हैं (What Data We Collect)',
+            title: t('legal.privacy.collect', 'What Data We Collect'),
             content: `• Name, email, phone number (account creation)\n• Store name, GSTIN, business type\n• Product catalog, bills, customer records\n• Device info (for offline sync)\n• Usage analytics (anonymized)\n\nWe do NOT collect: Aadhaar, PAN, bank passwords, or biometric data.`,
         },
         {
             id: 'use',
-            title: 'हम डेटा कैसे इस्तेमाल करते हैं (How We Use Data)',
+            title: t('legal.privacy.use', 'How We Use Data'),
             content: `• Provide billing, inventory, and analytics services\n• Improve AI predictions (demand forecasting, smart pricing)\n• Send WhatsApp bills and notifications (with your consent)\n• Generate GST reports\n• Customer support\n\nWe NEVER sell your data to third parties.`,
         },
         {
             id: 'store',
-            title: 'डेटा कहाँ रखा जाता है (Where Data is Stored)',
+            title: t('legal.privacy.store', 'Where Data is Stored'),
             content: `• Cloud: PostgreSQL on servers in India (Neon.tech, AWS Mumbai region)\n• Local: Your device (offline mode — SQLite/IndexedDB)\n• Encryption: AES-256 for sensitive fields (phone, email, GSTIN)\n• Backups: Daily encrypted backups, 30-day retention`,
         },
         {
             id: 'share',
-            title: 'डेटा किसके साथ शेयर होता है (Data Sharing)',
+            title: t('legal.privacy.share', 'Data Sharing'),
             content: `We share data ONLY:\n• With your explicit consent\n• To comply with Indian law (court orders, tax authorities)\n• With service providers (hosting, email) under strict contracts\n\nWe NEVER share your customer lists, sales data, or financial information with competitors or advertisers.`,
         },
         {
             id: 'rights',
-            title: 'आपके अधिकार (Your Rights — DPDP Act 2023)',
+            title: t('legal.privacy.rights', 'Your Rights — DPDP Act 2023'),
             content: `Under India's Digital Personal Data Protection Act 2023, you have the right to:\n\n✅ Access: View all data we have about you\n✅ Correction: Fix any incorrect data\n✅ Erasure: Delete your account and all data\n✅ Portability: Export your data (JSON format)\n✅ Withdraw Consent: Opt out of marketing communications\n✅ Grievance: File complaint with our Grievance Officer\n\nTo exercise these rights, email: privacy@kadaigpt.com`,
         },
         {
             id: 'retention',
-            title: 'डेटा कब तक रहता है (Data Retention)',
+            title: t('legal.privacy.retention', 'Data Retention'),
             content: `• Active accounts: Data retained while account is active\n• After account deletion: PII anonymized within 30 days\n• Financial records: Retained for 8 years (GST compliance)\n• Audit logs: Retained for 2 years\n• Backups: Purged within 90 days of deletion request`,
         },
         {
             id: 'children',
-            title: 'बच्चों की गोपनीयता (Children\'s Privacy)',
+            title: t('legal.privacy.children', "Children's Privacy"),
             content: `KadaiGPT is designed for business use by adults (18+). We do not knowingly collect data from children under 18. If you believe a child has provided us data, contact privacy@kadaigpt.com.`,
         },
         {
             id: 'contact',
-            title: 'संपर्क करें (Contact Us)',
+            title: t('legal.privacy.contact', 'Contact Us'),
             content: `Data Protection Officer / Grievance Officer:\nEmail: privacy@kadaigpt.com\nPhone: +91 98765 43210\nAddress: KadaiGPT Technologies, Chennai, Tamil Nadu, India\n\nResponse time: Within 72 hours\nComplaint resolution: Within 30 days`,
         },
     ]
@@ -58,53 +60,55 @@ export default function LegalPages({ page = 'privacy', onBack }) {
     const termsSections = [
         {
             id: 'acceptance',
-            title: 'सेवा की शर्तें (Acceptance of Terms)',
+            title: t('legal.terms.acceptance', 'Acceptance of Terms'),
             content: `By using KadaiGPT, you agree to these terms. If you disagree, please stop using the service. We may update these terms; continued use means acceptance of changes.`,
         },
         {
             id: 'account',
-            title: 'खाता (Account Responsibilities)',
+            title: t('legal.terms.account', 'Account Responsibilities'),
             content: `• You must provide accurate information during registration\n• You are responsible for keeping your password secure\n• One account per store (multi-store via Business plan)\n• You must be 18+ and authorized to operate the business\n• Report unauthorized access immediately`,
         },
         {
             id: 'acceptable',
-            title: 'स्वीकार्य उपयोग (Acceptable Use)',
+            title: t('legal.terms.acceptable', 'Acceptable Use'),
             content: `You agree NOT to:\n• Use the service for illegal activities\n• Upload malicious code or attempt to hack the system\n• Scrape data or reverse-engineer our AI models\n• Share your account with unauthorized users\n• Use the service to harass customers or competitors\n• Exceed fair usage limits (API rate limits apply)`,
         },
         {
             id: 'data',
-            title: 'आपका डेटा (Your Data)',
+            title: t('legal.terms.data', 'Your Data'),
             content: `• You own your business data (products, bills, customers)\n• We have a license to process it for providing the service\n• You can export your data at any time (JSON format)\n• You can delete your account and all data\n• We create anonymized analytics (no PII) to improve our AI`,
         },
         {
             id: 'payment',
-            title: 'भुगतान (Payment Terms)',
+            title: t('legal.terms.payment', 'Payment Terms'),
             content: `• Free plan: No charge, limited features\n• Paid plans: Billed monthly/annually in advance\n• Refund policy: 7-day money-back guarantee\n• Price changes: 30 days advance notice\n• Non-payment: Account downgraded to Free after 7-day grace period\n• GST: All prices exclusive of applicable GST`,
         },
         {
             id: 'availability',
-            title: 'सेवा उपलब्धता (Service Availability)',
+            title: t('legal.terms.availability', 'Service Availability'),
             content: `• We target 99.9% uptime but do not guarantee it\n• Scheduled maintenance: Sundays 2-4 AM IST (advance notice)\n• Offline mode ensures billing works without internet\n• We are not responsible for losses due to unplanned outages\n• Status updates: status.kadaigpt.com`,
         },
         {
             id: 'liability',
-            title: 'दायित्व (Liability)',
+            title: t('legal.terms.liability', 'Liability'),
             content: `• We are not liable for data loss beyond what our backup systems cover\n• Maximum liability: Total amount paid by you in the last 12 months\n• We are not responsible for decisions made based on AI predictions\n• Use AI insights as guidance, not absolute truth\n• Maintain your own backup of critical business data`,
         },
         {
             id: 'termination',
-            title: 'समाप्ति (Termination)',
+            title: t('legal.terms.termination', 'Termination'),
             content: `• You can cancel your account at any time\n• We may suspend accounts that violate these terms\n• Upon termination, you have 30 days to export your data\n• After 30 days, data is permanently deleted\n• Refunds for prepaid annual plans: Prorated, minus 1 month`,
         },
         {
             id: 'dispute',
-            title: 'विवाद समाधान (Dispute Resolution)',
+            title: t('legal.terms.dispute', 'Dispute Resolution'),
             content: `• Governing law: Laws of India\n• Jurisdiction: Courts of Chennai, Tamil Nadu\n• Disputes: First attempt mediation, then arbitration\n• Arbitration: As per Indian Arbitration & Conciliation Act, 1996`,
         },
     ]
 
     const sections = page === 'privacy' ? privacySections : termsSections
-    const title = page === 'privacy' ? 'गोपनीयता नीति (Privacy Policy)' : 'सेवा की शर्तें (Terms of Service)'
+    const title = page === 'privacy'
+        ? t('legal.privacyPolicy', 'Privacy Policy')
+        : t('legal.termsOfService', 'Terms of Service')
     const Icon = page === 'privacy' ? Shield : FileText
     const lastUpdated = 'March 4, 2026'
 
@@ -117,7 +121,7 @@ export default function LegalPages({ page = 'privacy', onBack }) {
                     background: 'none', border: 'none', color: 'var(--primary, #6366f1)',
                     cursor: 'pointer', marginBottom: '16px', fontSize: '14px', fontWeight: 600,
                 }}>
-                    <ArrowLeft size={16} /> Back to Settings
+                    <ArrowLeft size={16} /> {t('common.back', 'Back')}
                 </button>
             )}
 
