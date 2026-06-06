@@ -445,6 +445,45 @@
   .brand-name {
     font-size: 1.1rem;
   }
+
+  /* Declutter the top navbar so it never overflows on small screens.
+     The bottom nav + More menu cover navigation, theme, and status. */
+  .top-navbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+
+  .navbar-right {
+    gap: 6px;
+  }
+
+  /* Hide redundant/desktop-only controls on phones */
+  .hide-on-mobile,
+  .status-indicator {
+    display: none !important;
+  }
+
+  /* Slightly smaller tap targets so the remaining icons fit comfortably */
+  .navbar-right .icon-btn,
+  .navbar-right .user-avatar {
+    width: 34px;
+    height: 34px;
+  }
+
+  .user-btn {
+    padding: 4px 6px;
+    gap: 4px;
+  }
+}
+
+/* Extra-small phones (≤380px): trim the brand text to guarantee fit */
+@media (max-width: 380px) {
+  .brand-name {
+    font-size: 1rem;
+  }
+  .navbar-right {
+    gap: 4px;
+  }
 }
 
 /* ============================================

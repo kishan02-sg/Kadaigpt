@@ -439,13 +439,13 @@ function App() {
                     {/* Language Switcher */}
                     <LanguageSwitcher compact />
 
-                    {/* Theme Toggle */}
-                    <button className="icon-btn theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                    {/* Theme Toggle (hidden on mobile — also available in the bottom-nav More menu) */}
+                    <button className="icon-btn theme-toggle hide-on-mobile" onClick={toggleTheme} title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
                         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                     </button>
 
-                    {/* Command Palette Trigger */}
-                    <button className="icon-btn" onClick={() => setShowCommandPalette(true)} title="Quick Actions (Ctrl+K)">
+                    {/* Command Palette Trigger (desktop only) */}
+                    <button className="icon-btn cmd-palette-btn hide-on-mobile" onClick={() => setShowCommandPalette(true)} title="Quick Actions (Ctrl+K)">
                         <Command size={18} />
                     </button>
 
