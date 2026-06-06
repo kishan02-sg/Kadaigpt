@@ -17,6 +17,8 @@ from app.models import (
     Category, DailySummary
 )
 from app.routers.auth import get_current_active_user
+from app.constants.roles import UserRole
+from app.rbac import require_min_role
 
 router = APIRouter(prefix="/backup", tags=["Data Backup"])
 
@@ -27,7 +29,8 @@ async def export_store_data(
     include_products: bool = Query(True, description="Include products"),
     include_customers: bool = Query(True, description="Include customers"),
     days: int = Query(90, ge=1, le=365, description="Export bills from last N days"),
-    current_user: User = Depends(get_current_active_user),
+    # Full-store data export is sensitive — restrict to Manager and above.
+    current_user: User = Depends(require_min_role(UserRole.MANAGER)),
     db: AsyncSession = Depends(get_db)
 ):
     """

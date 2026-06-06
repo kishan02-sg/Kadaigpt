@@ -10,15 +10,25 @@ from typing import List, Optional
 
 from app.database import get_db
 from app.models import Product, Category, User
+from app.constants.roles import UserRole
 from app.schemas import (
     ProductCreate, ProductUpdate, ProductResponse,
     CategoryCreate, CategoryResponse
 )
 from app.routers.auth import get_current_active_user
+from app.rbac import require_role
 from app.agents import inventory_agent
 
 
 router = APIRouter(prefix="/products", tags=["Products"])
+
+# Catalog mutations are restricted to roles that manage inventory.
+# (Cashiers can read products for billing but must not create/edit/delete them.)
+# Note: INVENTORY_MANAGER and CASHIER share the same level, so we use an explicit
+# role list rather than require_min_role.
+require_catalog_manager = require_role(
+    UserRole.OWNER, UserRole.MANAGER, UserRole.INVENTORY_MANAGER
+)
 
 
 # ==================== CATEGORIES ====================
@@ -38,7 +48,7 @@ async def list_categories(
 @router.post("/categories", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 async def create_category(
     category: CategoryCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_catalog_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new category"""
@@ -55,7 +65,7 @@ async def create_category(
 @router.delete("/categories/{category_id}")
 async def delete_category(
     category_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_catalog_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a category"""
@@ -155,7 +165,7 @@ async def get_product(
 @router.post("", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
 async def create_product(
     product: ProductCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_catalog_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new product"""
@@ -199,7 +209,7 @@ async def create_product(
 async def update_product(
     product_id: int,
     product_update: ProductUpdate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_catalog_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """Update a product"""
@@ -230,7 +240,7 @@ async def update_product(
 @router.delete("/{product_id}")
 async def delete_product(
     product_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_catalog_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a product (soft delete)"""
@@ -258,7 +268,7 @@ async def adjust_stock(
     product_id: int,
     quantity: int = Query(..., description="Positive to add, negative to subtract"),
     reason: str = Query(default="manual_adjustment"),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_catalog_manager),
     db: AsyncSession = Depends(get_db)
 ):
     """Manually adjust product stock"""

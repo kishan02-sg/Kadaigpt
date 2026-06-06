@@ -17,9 +17,17 @@ import logging
 from app.database import get_db
 from app.routers.auth import get_current_user
 from app.models import User
+from app.constants.roles import UserRole
+from app.rbac import require_role, require_min_role
 
 router = APIRouter(prefix="/bulk", tags=["Bulk Operations"])
 logger = logging.getLogger(__name__)
+
+# Bulk writes are privileged. Imports affect the whole catalog/customer base;
+# restore overwrites store data and is owner-only.
+require_bulk_importer = require_role(
+    UserRole.OWNER, UserRole.MANAGER, UserRole.INVENTORY_MANAGER
+)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -153,7 +161,7 @@ class ImportResult(BaseModel):
 async def import_products(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = None,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_bulk_importer)
 ):
     """Import products from CSV file"""
     if not file.filename.endswith('.csv'):
@@ -202,7 +210,7 @@ async def import_products(
 @router.post("/import/customers", response_model=ImportResult)
 async def import_customers(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_min_role(UserRole.MANAGER))
 ):
     """Import customers from CSV file"""
     if not file.filename.endswith('.csv'):
@@ -287,7 +295,7 @@ Lakshmi Stores,9876543211,lakshmi@email.com,456 Market Road,50000
 
 @router.get("/backup")
 async def create_backup(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_min_role(UserRole.MANAGER))
 ):
     """Create a full backup of all store data"""
     backup_data = {
@@ -327,7 +335,7 @@ async def create_backup(
 @router.post("/restore")
 async def restore_backup(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role(UserRole.OWNER))
 ):
     """Restore data from a backup file"""
     if not file.filename.endswith('.json'):

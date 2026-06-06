@@ -138,10 +138,55 @@ class Settings(BaseSettings):
         return url
 
 
+# Default placeholder secrets — the app MUST refuse to use these in production.
+_DEFAULT_SECRET_KEY = "kadaigpt-dev-secret-key-CHANGE-IN-PRODUCTION"
+_DEFAULT_JWT_SECRET_KEY = "kadaigpt-dev-jwt-key-CHANGE-IN-PRODUCTION"
+
+
+def _is_production(s: "Settings") -> bool:
+    """Treat anything that isn't an explicit dev/test/local env as production.
+
+    Serverless deploys (Vercel) are always production-grade even if APP_ENV
+    was left at its default, so we fail closed there too.
+    """
+    env = (s.app_env or "").lower()
+    if s.is_serverless:
+        return True
+    return env not in ("development", "dev", "test", "testing", "local")
+
+
+def _validate_security(s: "Settings") -> None:
+    """Fail-fast: never run with publicly-known default signing secrets in prod.
+
+    A default JWT secret means anyone can forge a token for any user. This guard
+    raises at startup instead of silently signing tokens with a known string.
+    """
+    if not _is_production(s):
+        return
+
+    weak = []
+    if s.jwt_secret_key == _DEFAULT_JWT_SECRET_KEY or not s.jwt_secret_key:
+        weak.append("JWT_SECRET_KEY")
+    if s.secret_key == _DEFAULT_SECRET_KEY or not s.secret_key:
+        weak.append("SECRET_KEY")
+    # A 64-char random string is recommended; reject obviously short secrets too.
+    if s.jwt_secret_key and len(s.jwt_secret_key) < 32 and "JWT_SECRET_KEY" not in weak:
+        weak.append("JWT_SECRET_KEY (too short, need >=32 chars)")
+
+    if weak:
+        raise RuntimeError(
+            "SECURITY: refusing to start in production with insecure secret(s): "
+            f"{', '.join(weak)}. Set strong random values via environment variables. "
+            "Generate one with: python -c \"import secrets;print(secrets.token_urlsafe(48))\""
+        )
+
+
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance"""
-    return Settings()
+    s = Settings()
+    _validate_security(s)
+    return s
 
 
 settings = get_settings()
