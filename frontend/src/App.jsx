@@ -77,11 +77,7 @@ function App() {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const [showNotifications, setShowNotifications] = useState(false)
     const [warmupStatus, setWarmupStatus] = useState({ status: 'checking', message: '' })
-    const [notifications, setNotifications] = useState([
-        { id: 1, type: 'warning', message: 'Sugar stock is low (3 left)', time: '5 min ago', read: false },
-        { id: 2, type: 'info', message: 'New bill #1234 created', time: '10 min ago', read: false },
-        { id: 3, type: 'success', message: 'Daily backup completed', time: '1 hour ago', read: true },
-    ])
+    const [notifications, setNotifications] = useState([])
 
     const setCurrentPage = (page) => {
         setCurrentPageState(page)
@@ -197,6 +193,60 @@ function App() {
             setToasts(prev => prev.filter(t => t.id !== id))
         }, 4000)
     }
+
+    // Map a backend notification_type to a UI style class
+    const mapNotifType = (t) => {
+        const s = (t || '').toLowerCase()
+        if (s.includes('low') || s.includes('stock') || s.includes('warn') || s.includes('due')) return 'warning'
+        if (s.includes('success') || s.includes('paid') || s.includes('backup') || s.includes('complete')) return 'success'
+        return 'info'
+    }
+
+    const relativeTime = (iso) => {
+        if (!iso) return ''
+        const diff = Date.now() - new Date(iso).getTime()
+        const m = Math.floor(diff / 60000)
+        if (m < 1) return 'just now'
+        if (m < 60) return `${m} min ago`
+        const h = Math.floor(m / 60)
+        if (h < 24) return `${h} hour${h > 1 ? 's' : ''} ago`
+        const d = Math.floor(h / 24)
+        return `${d} day${d > 1 ? 's' : ''} ago`
+    }
+
+    const loadNotifications = async () => {
+        try {
+            const data = await api.getInAppNotifications(20)
+            const items = (data?.notifications || []).map(n => ({
+                id: n.id,
+                type: mapNotifType(n.notification_type),
+                message: n.title ? `${n.title}: ${n.message}` : n.message,
+                time: relativeTime(n.created_at),
+                read: n.is_read,
+            }))
+            setNotifications(items)
+        } catch (e) {
+            // Notifications are non-critical — fail quietly (e.g., offline / demo mode)
+            console.warn('[App] Could not load notifications:', e?.message)
+        }
+    }
+
+    const markAllNotificationsRead = async () => {
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })))  // optimistic
+        try {
+            await api.markAllNotificationsRead()
+        } catch (e) {
+            console.warn('[App] mark-all-read failed:', e?.message)
+        }
+    }
+
+    // Load notifications once the user is authenticated, then refresh periodically.
+    useEffect(() => {
+        if (!user) return
+        loadNotifications()
+        const iv = setInterval(loadNotifications, 60000)
+        return () => clearInterval(iv)
+    }, [user])
 
     const handleLogin = (userData) => {
         if (!userData.isDemo) {
@@ -414,7 +464,7 @@ function App() {
                             <div className="notification-dropdown">
                                 <div className="notification-header">
                                     <span>{t('notifications.title', 'Notifications')}</span>
-                                    <button onClick={() => setNotifications(notifications.map(n => ({ ...n, read: true })))}>
+                                    <button onClick={markAllNotificationsRead}>
                                         {t('notifications.markAllRead', 'Mark all read')}
                                     </button>
                                 </div>

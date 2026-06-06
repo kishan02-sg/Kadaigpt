@@ -811,6 +811,39 @@ class ApiService {
         return this.request('/notifications/status')
     }
 
+    // ===== In-app (DB-backed) notifications — served at /api/notifications (no /v1) =====
+    _inAppNotifUrl(path = '') {
+        // baseUrl ends with /api/v1; the in-app notifications router is at /api/notifications
+        return `${this.baseUrl.replace(/\/v1$/, '')}/notifications${path}`
+    }
+
+    async _inAppNotifFetch(path, options = {}) {
+        const token = this.getToken()
+        const res = await fetch(this._inAppNotifUrl(path), {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                ...options.headers,
+            },
+        })
+        if (!res.ok) throw new Error(`Notifications request failed: ${res.status}`)
+        return res.json()
+    }
+
+    // Returns { total, unread_count, notifications: [...] }
+    async getInAppNotifications(limit = 20) {
+        return this._inAppNotifFetch(`/?limit=${limit}`)
+    }
+
+    async markNotificationRead(id) {
+        return this._inAppNotifFetch(`/${id}/read`, { method: 'PUT' })
+    }
+
+    async markAllNotificationsRead() {
+        return this._inAppNotifFetch('/mark-all-read', { method: 'PUT' })
+    }
+
     // ==================== AI AGENTS ENDPOINTS ====================
 
     async getAgentSuggestions(storeId = 1) {
