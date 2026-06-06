@@ -1,7 +1,19 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Home, ShoppingCart, Package, Users, MoreHorizontal, X, FileText, BarChart3, Settings, Wallet, ClipboardList, Truck, MessageCircle, Star, Upload, UserCog, Store, CreditCard, Sun, Moon } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import './MobileNav.css'
+
+// Map a nav item id to its i18n key so the bottom nav translates with the app language.
+const NAV_I18N = {
+  'dashboard': 'nav.dashboard', 'create-bill': 'nav.newBill', 'bills': 'nav.bills',
+  'products': 'nav.products', 'customers': 'nav.customers', 'more': 'nav.more',
+  'ocr': 'nav.ocr', 'settings': 'nav.settings', 'suppliers': 'nav.suppliers',
+  'bulk-operations': 'nav.bulkOperations', 'analytics': 'nav.analytics', 'staff': 'nav.staff',
+  'gst': 'nav.gst', 'expenses': 'nav.expenses', 'daily-summary': 'nav.dailySummary',
+  'ai-insights': 'nav.aiInsights', 'whatsapp': 'nav.whatsapp', 'loyalty': 'nav.loyalty',
+  'stores': 'nav.stores', 'subscription': 'nav.subscription',
+}
 
 // Role-specific navigation configurations
 // - Cashier: Billing first, minimal navigation
@@ -96,6 +108,9 @@ export default function MobileNav({ currentPage, setCurrentPage, userRole: userR
     // fall back to localStorage for safety.
     const userRole = userRoleProp || localStorage.getItem('kadai_user_role') || 'owner'
     const { theme, toggleTheme } = useTheme()
+    const { t } = useTranslation()
+    // Translate a nav label by id; fall back to the hardcoded English label.
+    const navLabel = (item) => (NAV_I18N[item.id] ? t(NAV_I18N[item.id], item.label) : item.label)
 
     useEffect(() => {
         const checkMobile = () => {
@@ -136,11 +151,11 @@ export default function MobileNav({ currentPage, setCurrentPage, userRole: userR
                             key={item.id}
                             className={`mobile-nav-item ${isActive ? 'active' : ''}`}
                             onClick={() => handleNavClick(item.id)}
-                            aria-label={item.label}
+                            aria-label={navLabel(item)}
                             aria-current={isActive ? 'page' : undefined}
                         >
                             <Icon size={24} aria-hidden="true" />
-                            <span>{item.label}</span>
+                            <span>{navLabel(item)}</span>
                         </button>
                     )
                 })}
@@ -187,7 +202,7 @@ export default function MobileNav({ currentPage, setCurrentPage, userRole: userR
                                     className={`more-menu-item ${currentPage === item.id ? 'active' : ''}`}
                                     onClick={() => handleNavClick(item.id)}
                                 >
-                                    {item.label}
+                                    {navLabel(item)}
                                 </button>
                             ))}
                         </div>
