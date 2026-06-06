@@ -132,7 +132,14 @@
     "credit": "Credit",
     "due": "Due",
     "offlineBill": "Offline Bill",
-    "pendingSync": "Pending Sync"
+    "pendingSync": "Pending Sync",
+    "allBills": "All Bills",
+    "subtitle": "View, search, and export your billing history",
+    "billsFound": "Bills Found",
+    "totalRevenue": "Total Revenue",
+    "avgBillValue": "Avg Bill Value",
+    "filters": "Filters",
+    "export": "Export"
   },
   "createBill": {
     "title": "Create New Bill",

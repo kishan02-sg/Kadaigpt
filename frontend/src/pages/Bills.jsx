@@ -245,8 +245,8 @@ export default function Bills({ addToast, setCurrentPage }) {
         <div className="bills-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">📄 All Bills</h1>
-                    <p className="page-subtitle">View, search, and export your billing history</p>
+                    <h1 className="page-title">📄 {t('bills.allBills', 'All Bills')}</h1>
+                    <p className="page-subtitle">{t('bills.subtitle', 'View, search, and export your billing history')}</p>
                 </div>
                 {localStorage.getItem('kadai_user_role')?.toLowerCase() !== 'owner' && (
                 <button className="btn btn-primary" onClick={() => setCurrentPage('create-bill')}>
@@ -261,21 +261,21 @@ export default function Bills({ addToast, setCurrentPage }) {
                     <FileText size={18} />
                     <div>
                         <span className="stat-mini-value">{totalBills}</span>
-                        <span className="stat-mini-label">Bills Found</span>
+                        <span className="stat-mini-label">{t('bills.billsFound', 'Bills Found')}</span>
                     </div>
                 </div>
                 <div className="stat-mini">
                     <TrendingUp size={18} />
                     <div>
                         <span className="stat-mini-value">₹{totalRevenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
-                        <span className="stat-mini-label">Total Revenue</span>
+                        <span className="stat-mini-label">{t('bills.totalRevenue', 'Total Revenue')}</span>
                     </div>
                 </div>
                 <div className="stat-mini">
                     <ArrowUpRight size={18} />
                     <div>
                         <span className="stat-mini-value">₹{totalBills > 0 ? Math.round(totalRevenue / totalBills) : 0}</span>
-                        <span className="stat-mini-label">Avg Bill Value</span>
+                        <span className="stat-mini-label">{t('bills.avgBillValue', 'Avg Bill Value')}</span>
                     </div>
                 </div>
             </div>
@@ -287,18 +287,18 @@ export default function Bills({ addToast, setCurrentPage }) {
                     <input
                         type="text"
                         className="form-input"
-                        placeholder="Search by bill number, customer name, or phone..."
+                        placeholder={t('bills.search', 'Search by bill number, customer name, or phone...')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
                 </div>
                 <div className="filter-actions">
                     <button className={`btn btn-ghost ${showFilters ? 'active' : ''}`} onClick={() => setShowFilters(!showFilters)}>
-                        <Filter size={18} /> Filters <ChevronDown size={16} />
+                        <Filter size={18} /> {t('bills.filters', 'Filters')} <ChevronDown size={16} />
                     </button>
                     <div className="export-dropdown">
                         <button className="btn btn-secondary">
-                            <Download size={18} /> Export
+                            <Download size={18} /> {t('bills.export', 'Export')}
                         </button>
                         <div className="dropdown-menu">
                             <button onClick={exportToCSV}>📊 Export as CSV</button>

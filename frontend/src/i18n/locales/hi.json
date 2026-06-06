@@ -132,7 +132,14 @@
     "credit": "उधार",
     "due": "बाकी",
     "offlineBill": "ऑफलाइन बिल",
-    "pendingSync": "सिंक लंबित"
+    "pendingSync": "सिंक लंबित",
+    "allBills": "सभी बिल",
+    "subtitle": "अपना बिलिंग इतिहास देखें, खोजें और निर्यात करें",
+    "billsFound": "बिल मिले",
+    "totalRevenue": "कुल आय",
+    "avgBillValue": "औसत बिल मूल्य",
+    "filters": "फ़िल्टर",
+    "export": "निर्यात"
   },
   "createBill": {
     "title": "नया बिल बनाएं",
