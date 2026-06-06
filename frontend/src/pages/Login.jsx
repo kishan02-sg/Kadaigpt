@@ -23,6 +23,7 @@ export default function Login({ onLogin }) {
   // Forgot password state (OTP-based)
   const [showForgotPassword, setShowForgotPassword] = useState(false)
   const [forgotPhone, setForgotPhone] = useState('')
+  const [forgotEmail, setForgotEmail] = useState('')
   const [otpCode, setOtpCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [forgotStep, setForgotStep] = useState(1) // 1=phone, 2=otp+password
@@ -358,7 +359,7 @@ export default function Login({ onLogin }) {
                     <input type="checkbox" id="rememberme" name="rememberme" />
                     <span>Remember me</span>
                   </label>
-                  <button type="button" className="forgot-link" onClick={() => { setShowForgotPassword(true); setForgotStep(1); setForgotPhone(''); setForgotMessage(''); setForgotError(''); setOtpCode(''); setNewPassword(''); setOtpPreview('') }}>
+                  <button type="button" className="forgot-link" onClick={() => { setShowForgotPassword(true); setForgotStep(1); setForgotEmail(''); setForgotMessage(''); setForgotError(''); setOtpCode(''); setNewPassword(''); setOtpPreview('') }}>
                     Forgot password?
                   </button>
                 </div>
@@ -439,42 +440,40 @@ export default function Login({ onLogin }) {
               {forgotStep === 1 ? (
                 <>
                   <p style={{ marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    Enter your registered phone number. We'll send an OTP to verify your identity.
+                    Enter your registered email. We'll send a verification code to confirm your identity.
                   </p>
                   <div className="form-group">
-                    <label className="form-label">Phone Number</label>
+                    <label className="form-label">Email Address</label>
                     <input
-                      type="tel"
+                      type="email"
                       className="form-input"
-                      value={forgotPhone}
-                      onChange={e => setForgotPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      placeholder="Enter 10-digit phone number"
-                      maxLength={10}
+                      value={forgotEmail}
+                      onChange={e => setForgotEmail(e.target.value)}
+                      placeholder="you@example.com"
                       autoFocus
                     />
                   </div>
                   <button
                     className="btn btn-primary w-full"
-                    disabled={forgotLoading || forgotPhone.length < 10}
+                    disabled={forgotLoading || !/^\S+@\S+\.\S+$/.test(forgotEmail)}
                     onClick={async () => {
                       setForgotLoading(true); setForgotError('');
                       try {
-                        const result = await api.forgotPasswordPhone(forgotPhone);
-                        setOtpPreview(result.otp_preview || '');
-                        setForgotMessage(`OTP sent to ******${forgotPhone.slice(-4)}`);
+                        await api.forgotPasswordEmailOtp(forgotEmail);
+                        setForgotMessage(`If that email is registered, a code has been sent to ${forgotEmail}`);
                         setForgotStep(2);
                       } catch (err) {
-                        setForgotError(err.message || 'Failed to send OTP');
+                        setForgotError(err.message || 'Failed to send code');
                       } finally { setForgotLoading(false) }
                     }}
                   >
-                    {forgotLoading ? 'Sending...' : 'Send OTP'}
+                    {forgotLoading ? 'Sending...' : 'Send Code'}
                   </button>
                 </>
               ) : (
                 <>
                   <p style={{ marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    Enter the OTP sent to your phone and set a new password.
+                    Enter the code sent to your email and set a new password.
                   </p>
                   {otpPreview && (
                     <div style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '10px 14px', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem', textAlign: 'center' }}>
@@ -488,7 +487,7 @@ export default function Login({ onLogin }) {
                       className="form-input"
                       value={otpCode}
                       onChange={e => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="Enter 4-digit OTP"
+                      placeholder="Enter 6-digit code"
                       maxLength={6}
                       autoFocus
                       style={{ fontSize: '1.5rem', letterSpacing: '8px', textAlign: 'center', fontWeight: 700 }}
@@ -507,11 +506,11 @@ export default function Login({ onLogin }) {
                   </div>
                   <button
                     className="btn btn-primary w-full"
-                    disabled={forgotLoading || otpCode.length < 4 || newPassword.length < 8}
+                    disabled={forgotLoading || otpCode.length < 6 || newPassword.length < 8}
                     onClick={async () => {
                       setForgotLoading(true); setForgotError('');
                       try {
-                        await api.verifyOTPReset(forgotPhone, otpCode, newPassword);
+                        await api.verifyEmailOtpReset(forgotEmail, otpCode, newPassword);
                         setForgotMessage('Password reset successfully! You can now login.');
                         setTimeout(() => { setShowForgotPassword(false); setForgotStep(1); setOtpCode(''); setNewPassword('') }, 2000);
                       } catch (err) {
@@ -526,7 +525,7 @@ export default function Login({ onLogin }) {
                     style={{ marginTop: '12px', background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.85rem', width: '100%', textAlign: 'center' }}
                     onClick={() => { setForgotStep(1); setForgotError(''); setForgotMessage(''); setOtpPreview('') }}
                   >
-                    ← Change phone number
+                    ← Change email
                   </button>
                 </>
               )}

@@ -356,6 +356,31 @@ class ApiService {
         return data
     }
 
+    // Email-OTP password reset
+    async forgotPasswordEmailOtp(email) {
+        const response = await fetch(`${this.baseUrl}/auth/forgot-password-email-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        })
+        let data
+        try { data = await response.json() } catch { throw new Error('Server error. Try again.') }
+        if (!response.ok) throw new Error(data.detail || 'Failed to send code')
+        return data
+    }
+
+    async verifyEmailOtpReset(email, otp, newPassword) {
+        const response = await fetch(`${this.baseUrl}/auth/verify-email-otp-reset`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, otp, new_password: newPassword }),
+        })
+        let data
+        try { data = await response.json() } catch { throw new Error('Server error. Try again.') }
+        if (!response.ok) throw new Error(data.detail || 'Verification failed')
+        return data
+    }
+
     // Dashboard endpoints
     async getDashboardStats() {
         return this.request('/dashboard/stats')

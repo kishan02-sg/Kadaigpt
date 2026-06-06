@@ -21,7 +21,9 @@ from app.models import User, Store, UserRole
 from app.utils.password import validate_password_strength
 from app.services import auth_state
 from app.services.email_service import email_service
+from app.services.msg91_service import msg91_service
 import os
+import hmac
 from app.schemas import (
     Token, TokenData, LoginRequest, RegisterRequest, 
     UserResponse, StoreResponse
@@ -857,6 +859,116 @@ async def verify_otp_reset(
 
     # Clean up OTP
     await auth_state.delete_otp(db, phone_key)
+
+    return {"message": "Password reset successfully. You can now login with your new password.", "success": True}
+
+
+# ═══════════════════════════════════════════
+# EMAIL-OTP FORGOT PASSWORD
+# Delivery: MSG91 (if configured) → SMTP → log. OTP is generated/verified here.
+# ═══════════════════════════════════════════
+
+EMAIL_OTP_EXPIRE_MINUTES = 10
+EMAIL_OTP_MAX_ATTEMPTS = 5
+
+
+class ForgotPasswordEmailRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyEmailOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6)
+    new_password: str = Field(..., min_length=8)
+
+
+async def _deliver_otp_email(to_email: str, otp: str, name: str = "") -> None:
+    """Best-effort OTP delivery: MSG91 → SMTP → log (dev)."""
+    if msg91_service.enabled and await msg91_service.send_email_otp(to_email, otp, name):
+        return
+    if email_service.enabled:
+        html = f"""
+        <p>Hi {name or 'there'},</p>
+        <p>Your KadaiGPT verification code is:</p>
+        <p style="font-size:28px;font-weight:800;letter-spacing:6px">{otp}</p>
+        <p>This code expires in {EMAIL_OTP_EXPIRE_MINUTES} minutes. If you didn't
+        request it, you can ignore this email.</p>
+        """
+        try:
+            if await email_service.send_email_async(to_email, "Your KadaiGPT verification code", html):
+                return
+        except Exception as e:
+            logger.warning(f"[Email OTP] SMTP send failed: {type(e).__name__}: {e}")
+    # No delivery channel configured — log so it's usable in dev/testing.
+    logger.info(f"[Email OTP] (not delivered — configure MSG91/SMTP) {to_email}: {otp}")
+
+
+@router.post("/forgot-password-email-otp")
+async def forgot_password_email_otp(
+    request: ForgotPasswordEmailRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a 6-digit OTP to the user's email for password reset.
+    Always returns the same generic response (no account enumeration)."""
+    email = request.email.lower().strip()
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if user:
+        otp = f"{secrets.randbelow(1_000_000):06d}"
+        await auth_state.store_otp(db, f"email:{email}", otp, user.id, EMAIL_OTP_EXPIRE_MINUTES)
+        await _deliver_otp_email(email, otp, user.full_name)
+
+    return {
+        "message": "If an account with that email exists, a verification code has been sent.",
+        "success": True,
+        "expires_in": f"{EMAIL_OTP_EXPIRE_MINUTES} minutes",
+    }
+
+
+@router.post("/verify-email-otp-reset")
+async def verify_email_otp_reset(
+    request: VerifyEmailOTPRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Verify the email OTP and set a new password."""
+    validate_password_strength(request.new_password)
+
+    email = request.email.lower().strip()
+    key = f"email:{email}"
+
+    stored = await auth_state.get_otp(db, key)
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid code for this email. Please request a new one.",
+        )
+
+    attempts = await auth_state.increment_otp_attempts(db, key)
+    if attempts > EMAIL_OTP_MAX_ATTEMPTS:
+        await auth_state.delete_otp(db, key)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many attempts. Please request a new code.",
+        )
+
+    if not hmac.compare_digest(str(stored["otp"]), request.otp.strip()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid code. Please try again.",
+        )
+
+    result = await db.execute(select(User).where(User.id == stored["user_id"]))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.password_hash = get_password_hash(request.new_password)
+    user.tokens_valid_after = datetime.utcnow()  # revoke existing sessions
+    await db.commit()
+
+    await auth_state.delete_otp(db, key)
+    await auth_state.clear_attempts(db, email)
 
     return {"message": "Password reset successfully. You can now login with your new password.", "success": True}
 
