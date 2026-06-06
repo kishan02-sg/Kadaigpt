@@ -210,7 +210,21 @@
     "search": "Search customers...",
     "noCustomers": "No customers found",
     "customerSaved": "Customer saved!",
-    "customerDeleted": "Customer deleted!"
+    "customerDeleted": "Customer deleted!",
+    "creditBook": "Customer Credit Book (Khata)",
+    "subtitle": "Manage customer credits and track payments",
+    "totalCustomers": "Total Customers",
+    "totalPendingCredit": "Total Pending Credit",
+    "withPendingDues": "With Pending Dues",
+    "lastPurchase": "Last Purchase",
+    "pendingAmount": "Pending Amount",
+    "recordPayment": "Record Payment",
+    "remind": "Remind",
+    "segAll": "All",
+    "segVip": "VIP",
+    "segRegular": "Regular",
+    "segAtRisk": "At-Risk",
+    "segNew": "New"
   },
   "analytics": {
     "title": "Analytics",

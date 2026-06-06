@@ -210,7 +210,21 @@
     "search": "కస్టమర్లు శోధించండి...",
     "noCustomers": "కస్టమర్లు కనుగొనబడలేదు",
     "customerSaved": "కస్టమర్ సేవ్ అయ్యారు!",
-    "customerDeleted": "కస్టమర్ తొలగించబడ్డారు!"
+    "customerDeleted": "కస్టమర్ తొలగించబడ్డారు!",
+    "creditBook": "కస్టమర్ క్రెడిట్ బుక్ (ఖాతా)",
+    "subtitle": "కస్టమర్ క్రెడిట్‌లను నిర్వహించి చెల్లింపులను ట్రాక్ చేయండి",
+    "totalCustomers": "మొత్తం కస్టమర్లు",
+    "totalPendingCredit": "మొత్తం పెండింగ్ క్రెడిట్",
+    "withPendingDues": "పెండింగ్ ఉన్నవారు",
+    "lastPurchase": "చివరి కొనుగోలు",
+    "pendingAmount": "పెండింగ్ మొత్తం",
+    "recordPayment": "చెల్లింపు నమోదు చేయండి",
+    "remind": "గుర్తు చేయండి",
+    "segAll": "అన్నీ",
+    "segVip": "విఐపి",
+    "segRegular": "సాధారణ",
+    "segAtRisk": "ప్రమాదంలో",
+    "segNew": "కొత్త"
   },
   "analytics": {
     "title": "విశ్లేషణలు",

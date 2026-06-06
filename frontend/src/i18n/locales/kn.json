@@ -210,7 +210,21 @@
     "search": "ಗ್ರಾಹಕರನ್ನು ಹುಡುಕಿ...",
     "noCustomers": "ಗ್ರಾಹಕರು ಕಂಡುಬಂದಿಲ್ಲ",
     "customerSaved": "ಗ್ರಾಹಕ ಉಳಿಸಲಾಗಿದೆ!",
-    "customerDeleted": "ಗ್ರಾಹಕ ಅಳಿಸಲಾಗಿದೆ!"
+    "customerDeleted": "ಗ್ರಾಹಕ ಅಳಿಸಲಾಗಿದೆ!",
+    "creditBook": "ಗ್ರಾಹಕ ಸಾಲ ಪುಸ್ತಕ (ಖಾತೆ)",
+    "subtitle": "ಗ್ರಾಹಕ ಸಾಲಗಳನ್ನು ನಿರ್ವಹಿಸಿ ಮತ್ತು ಪಾವತಿಗಳನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ",
+    "totalCustomers": "ಒಟ್ಟು ಗ್ರಾಹಕರು",
+    "totalPendingCredit": "ಒಟ್ಟು ಬಾಕಿ ಸಾಲ",
+    "withPendingDues": "ಬಾಕಿ ಇರುವವರು",
+    "lastPurchase": "ಕೊನೆಯ ಖರೀದಿ",
+    "pendingAmount": "ಬಾಕಿ ಮೊತ್ತ",
+    "recordPayment": "ಪಾವತಿ ದಾಖಲಿಸಿ",
+    "remind": "ನೆನಪಿಸಿ",
+    "segAll": "ಎಲ್ಲಾ",
+    "segVip": "ವಿಐಪಿ",
+    "segRegular": "ನಿಯಮಿತ",
+    "segAtRisk": "ಅಪಾಯದಲ್ಲಿ",
+    "segNew": "ಹೊಸ"
   },
   "analytics": {
     "title": "ವಿಶ್ಲೇಷಣೆಗಳು",

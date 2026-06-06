@@ -210,7 +210,21 @@
     "search": "ग्राहक खोजें...",
     "noCustomers": "कोई ग्राहक नहीं मिला",
     "customerSaved": "ग्राहक सहेजा गया!",
-    "customerDeleted": "ग्राहक हटाया गया!"
+    "customerDeleted": "ग्राहक हटाया गया!",
+    "creditBook": "ग्राहक उधार बही (खाता)",
+    "subtitle": "ग्राहक उधार प्रबंधित करें और भुगतान ट्रैक करें",
+    "totalCustomers": "कुल ग्राहक",
+    "totalPendingCredit": "कुल बकाया उधार",
+    "withPendingDues": "बकाया वाले",
+    "lastPurchase": "अंतिम खरीद",
+    "pendingAmount": "बकाया राशि",
+    "recordPayment": "भुगतान दर्ज करें",
+    "remind": "याद दिलाएं",
+    "segAll": "सभी",
+    "segVip": "वीआईपी",
+    "segRegular": "नियमित",
+    "segAtRisk": "जोखिम में",
+    "segNew": "नया"
   },
   "analytics": {
     "title": "एनालिटिक्स",

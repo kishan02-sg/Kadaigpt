@@ -241,11 +241,11 @@ export default function Customers({ addToast, setCurrentPage }) {
         <div className="customers-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">👥 Customer Credit Book (Khata)</h1>
-                    <p className="page-subtitle">Manage customer credits and track payments</p>
+                    <h1 className="page-title">👥 {t('customers.creditBook', 'Customer Credit Book (Khata)')}</h1>
+                    <p className="page-subtitle">{t('customers.subtitle', 'Manage customer credits and track payments')}</p>
                 </div>
                 <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-                    <Plus size={18} /> Add Customer
+                    <Plus size={18} /> {t('customers.addCustomer', 'Add Customer')}
                 </button>
             </div>
 
@@ -255,21 +255,21 @@ export default function Customers({ addToast, setCurrentPage }) {
                     <Users size={24} />
                     <div>
                         <span className="stat-value">{customers.length}</span>
-                        <span className="stat-label">Total Customers</span>
+                        <span className="stat-label">{t('customers.totalCustomers', 'Total Customers')}</span>
                     </div>
                 </div>
                 <div className="stat-card warning">
                     <IndianRupee size={24} />
                     <div>
                         <span className="stat-value">₹{totalCredit.toLocaleString()}</span>
-                        <span className="stat-label">Total Pending Credit</span>
+                        <span className="stat-label">{t('customers.totalPendingCredit', 'Total Pending Credit')}</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <AlertCircle size={24} />
                     <div>
                         <span className="stat-value">{customersWithCredit}</span>
-                        <span className="stat-label">With Pending Dues</span>
+                        <span className="stat-label">{t('customers.withPendingDues', 'With Pending Dues')}</span>
                     </div>
                 </div>
             </div>
@@ -281,7 +281,7 @@ export default function Customers({ addToast, setCurrentPage }) {
                     <input
                         type="text"
                         className="form-input"
-                        placeholder="Search customers by name or phone..."
+                        placeholder={t('customers.search', 'Search customers by name or phone...')}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
@@ -303,7 +303,7 @@ export default function Customers({ addToast, setCurrentPage }) {
                             transition: 'all 0.2s'
                         }}
                     >
-                        {seg === 'VIP' ? '👑 ' : seg === 'Regular' ? '⭐ ' : seg === 'At-Risk' ? '⚠️ ' : seg === 'New' ? '🆕 ' : ''}{seg} ({segmentCounts[seg]})
+                        {seg === 'VIP' ? '👑 ' : seg === 'Regular' ? '⭐ ' : seg === 'At-Risk' ? '⚠️ ' : seg === 'New' ? '🆕 ' : ''}{t('customers.seg' + (seg === 'At-Risk' ? 'AtRisk' : seg === 'VIP' ? 'Vip' : seg), seg)} ({segmentCounts[seg]})
                     </button>
                 ))}
             </div>
@@ -349,15 +349,15 @@ export default function Customers({ addToast, setCurrentPage }) {
 
                         <div className="customer-stats">
                             <div className="customer-stat">
-                                <span className="label">Total Purchases</span>
+                                <span className="label">{t('customers.totalPurchases', 'Total Purchases')}</span>
                                 <span className="value">₹{(customer.total_purchases || 0).toLocaleString()}</span>
                             </div>
                             <div className="customer-stat">
-                                <span className="label">Loyalty Points</span>
+                                <span className="label">{t('customers.loyaltyPoints', 'Loyalty Points')}</span>
                                 <span className="value loyalty-points">⭐ {(customer.loyalty_points || customer.loyaltyPoints || 0).toLocaleString()}</span>
                             </div>
                             <div className="customer-stat">
-                                <span className="label">Last Purchase</span>
+                                <span className="label">{t('customers.lastPurchase', 'Last Purchase')}</span>
                                 <span className="value">
                                     {customer.last_purchase
                                         ? new Date(customer.last_purchase).toLocaleDateString('en-IN')
@@ -379,15 +379,15 @@ export default function Customers({ addToast, setCurrentPage }) {
                         {(customer.credit || 0) > 0 && (
                             <div className="credit-section">
                                 <div className="credit-amount">
-                                    <span>Pending Amount</span>
+                                    <span>{t('customers.pendingAmount', 'Pending Amount')}</span>
                                     <span className="amount">₹{customer.credit}</span>
                                 </div>
                                 <div className="credit-actions">
                                     <button className="btn btn-sm btn-secondary" onClick={() => setSelectedCustomer(customer)}>
-                                        <Check size={14} /> Record Payment
+                                        <Check size={14} /> {t('customers.recordPayment', 'Record Payment')}
                                     </button>
                                     <button className="btn btn-sm btn-ghost" onClick={() => sendReminder(customer)}>
-                                        <Send size={14} /> Remind
+                                        <Send size={14} /> {t('customers.remind', 'Remind')}
                                     </button>
                                 </div>
                             </div>
