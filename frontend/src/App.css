@@ -446,6 +446,13 @@
     font-size: 1.1rem;
   }
 
+  /* Page taglines (e.g. "Add products and generate invoice") just restate the
+     title and waste vertical space on phones. Hide them on mobile; they stay on
+     desktop where there's room. */
+  .page-subtitle {
+    display: none !important;
+  }
+
   /* Declutter the top navbar so it never overflows on small screens.
      The bottom nav + More menu cover navigation, theme, and status. */
   .top-navbar {
