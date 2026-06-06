@@ -141,7 +141,7 @@ export default function StoreManager({ addToast, setCurrentPage, onStoreChange }
                 </div>
                 <button className="add-btn" onClick={() => setShowAddModal(true)}>
                     <Plus size={18} />
-                    Add Store
+                    {t('storeManager.addStore', 'Add Store')}
                 </button>
             </div>
 

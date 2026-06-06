@@ -282,7 +282,8 @@
     "pendingOrders": "ಬಾಕಿ ಆದೇಶಗಳು",
     "totalSuppliers": "ಒಟ್ಟು ಪೂರೈಕೆದಾರರು",
     "purchaseOrders": "ಖರೀದಿ ಆದೇಶಗಳು",
-    "payables": "ಪಾವತಿಸಬೇಕಾದವು"
+    "payables": "ಪಾವತಿಸಬೇಕಾದವು",
+    "newOrder": "ಹೊಸ ಆದೇಶ"
   },
   "staff": {
     "title": "ಸಿಬ್ಬಂದಿ ನಿರ್ವಹಣೆ",
@@ -400,7 +401,9 @@
     "totalOutstanding": "ಒಟ್ಟು ಬಾಕಿ",
     "messagesSent": "ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳು",
     "totalCustomers": "ಒಟ್ಟು ಗ್ರಾಹಕರು",
-    "withPendingDues": "ಬಾಕಿ ಇರುವವರು"
+    "withPendingDues": "ಬಾಕಿ ಇರುವವರು",
+    "quickSend": "ತ್ವರಿತ ಕಳುಹಿಸಿ",
+    "sendVia": "WhatsApp ಮೂಲಕ ಕಳುಹಿಸಿ"
   },
   "bulkOps": {
     "title": "ಆಮದು/ರಫ್ತು",

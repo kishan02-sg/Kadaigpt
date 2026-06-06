@@ -282,7 +282,8 @@
     "pendingOrders": "Pending Orders",
     "totalSuppliers": "Total Suppliers",
     "purchaseOrders": "Purchase Orders",
-    "payables": "Payables"
+    "payables": "Payables",
+    "newOrder": "New Order"
   },
   "staff": {
     "title": "Staff Management",
@@ -400,7 +401,9 @@
     "totalOutstanding": "Total Outstanding",
     "messagesSent": "Messages Sent",
     "totalCustomers": "Total Customers",
-    "withPendingDues": "With Pending Dues"
+    "withPendingDues": "With Pending Dues",
+    "quickSend": "Quick Send",
+    "sendVia": "Send via WhatsApp"
   },
   "bulkOps": {
     "title": "Import/Export",

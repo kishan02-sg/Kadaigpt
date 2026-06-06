@@ -282,7 +282,8 @@
     "pendingOrders": "పెండింగ్ ఆర్డర్లు",
     "totalSuppliers": "మొత్తం సరఫరాదారులు",
     "purchaseOrders": "కొనుగోలు ఆర్డర్లు",
-    "payables": "చెల్లించవలసినవి"
+    "payables": "చెల్లించవలసినవి",
+    "newOrder": "కొత్త ఆర్డర్"
   },
   "staff": {
     "title": "సిబ్బంది నిర్వహణ",
@@ -400,7 +401,9 @@
     "totalOutstanding": "మొత్తం బకాయి",
     "messagesSent": "పంపిన సందేశాలు",
     "totalCustomers": "మొత్తం కస్టమర్లు",
-    "withPendingDues": "పెండింగ్ ఉన్నవారు"
+    "withPendingDues": "పెండింగ్ ఉన్నవారు",
+    "quickSend": "త్వరిత పంపండి",
+    "sendVia": "WhatsApp ద్వారా పంపండి"
   },
   "bulkOps": {
     "title": "దిగుమతి/ఎగుమతి",

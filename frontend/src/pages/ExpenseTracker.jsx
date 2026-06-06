@@ -155,7 +155,7 @@ export default function ExpenseTracker({ addToast }) {
                         <option value="year">This Year</option>
                     </select>
                     <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-                        <Plus size={18} /> Add Expense
+                        <Plus size={18} /> {t('expenses.addExpense', 'Add Expense')}
                     </button>
                 </div>
             </div>
@@ -167,7 +167,7 @@ export default function ExpenseTracker({ addToast }) {
                         <Wallet size={24} />
                     </div>
                     <div className="summary-info">
-                        <span className="label">Total Expenses</span>
+                        <span className="label">{t('expenses.totalExpenses', 'Total Expenses')}</span>
                         <span className="value">₹{totalExpenses.toLocaleString()}</span>
                     </div>
                     <div className="summary-trend negative">

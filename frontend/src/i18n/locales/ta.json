@@ -282,7 +282,8 @@
     "pendingOrders": "நிலுவை ஆர்டர்கள்",
     "totalSuppliers": "மொத்த சப்ளையர்கள்",
     "purchaseOrders": "கொள்முதல் ஆர்டர்கள்",
-    "payables": "செலுத்த வேண்டியவை"
+    "payables": "செலுத்த வேண்டியவை",
+    "newOrder": "புதிய ஆர்டர்"
   },
   "staff": {
     "title": "ஊழியர் மேலாண்மை",
@@ -400,7 +401,9 @@
     "totalOutstanding": "மொத்த நிலுவை",
     "messagesSent": "அனுப்பிய செய்திகள்",
     "totalCustomers": "மொத்த வாடிக்கையாளர்கள்",
-    "withPendingDues": "நிலுவை உள்ளவர்கள்"
+    "withPendingDues": "நிலுவை உள்ளவர்கள்",
+    "quickSend": "விரைவு அனுப்பு",
+    "sendVia": "WhatsApp வழியாக அனுப்பு"
   },
   "bulkOps": {
     "title": "இறக்குமதி/ஏற்றுமதி",

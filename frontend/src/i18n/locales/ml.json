@@ -282,7 +282,8 @@
     "pendingOrders": "തീർപ്പാക്കാത്ത ഓർഡറുകൾ",
     "totalSuppliers": "മൊത്തം വിതരണക്കാർ",
     "purchaseOrders": "വാങ്ങൽ ഓർഡറുകൾ",
-    "payables": "നൽകാനുള്ളവ"
+    "payables": "നൽകാനുള്ളവ",
+    "newOrder": "പുതിയ ഓർഡർ"
   },
   "staff": {
     "title": "ജീവനക്കാരുടെ മാനേജ്‌മെന്റ്",
@@ -330,7 +331,7 @@
     "category": "വിഭാഗം",
     "date": "തീയതി",
     "description": "വിവരണം",
-    "totalExpenses": "ആകെ ചെലവുകൾ",
+    "totalExpenses": "മൊത്തം ചെലവുകൾ",
     "thisMonth": "ഈ മാസം",
     "noExpenses": "ചെലവുകൾ രേഖപ്പെടുത്തിയിട്ടില്ല",
     "expenseSaved": "ചെലവ് സേവ് ചെയ്തു!",
@@ -400,7 +401,9 @@
     "totalOutstanding": "മൊത്തം കുടിശ്ശിക",
     "messagesSent": "അയച്ച സന്ദേശങ്ങൾ",
     "totalCustomers": "മൊത്തം ഉപഭോക്താക്കൾ",
-    "withPendingDues": "കുടിശ്ശിക ഉള്ളവർ"
+    "withPendingDues": "കുടിശ്ശിക ഉള്ളവർ",
+    "quickSend": "ദ്രുത അയയ്ക്കൽ",
+    "sendVia": "WhatsApp വഴി അയയ്ക്കുക"
   },
   "bulkOps": {
     "title": "ഇറക്കുമതി/കയറ്റുമതി",

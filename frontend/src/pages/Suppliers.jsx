@@ -287,10 +287,10 @@ export default function Suppliers({ addToast }) {
                 </div>
                 <div className="header-actions">
                     <button className="btn btn-secondary" onClick={() => setShowOrderModal(true)}>
-                        <Package size={18} /> New Order
+                        <Package size={18} /> {t('suppliers.newOrder', 'New Order')}
                     </button>
                     <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-                        <Plus size={18} /> Add Supplier
+                        <Plus size={18} /> {t('suppliers.addSupplier', 'Add Supplier')}
                     </button>
                 </div>
             </div>

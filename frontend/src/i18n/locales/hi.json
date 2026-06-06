@@ -282,7 +282,8 @@
     "pendingOrders": "लंबित आदेश",
     "totalSuppliers": "कुल आपूर्तिकर्ता",
     "purchaseOrders": "खरीद आदेश",
-    "payables": "देय राशि"
+    "payables": "देय राशि",
+    "newOrder": "नया आदेश"
   },
   "staff": {
     "title": "स्टाफ प्रबंधन",
@@ -330,7 +331,7 @@
     "category": "श्रेणी",
     "date": "तारीख",
     "description": "विवरण",
-    "totalExpenses": "कुल खर्चे",
+    "totalExpenses": "कुल खर्च",
     "thisMonth": "इस महीने",
     "noExpenses": "कोई खर्च दर्ज नहीं",
     "expenseSaved": "खर्च सहेजा गया!",
@@ -400,7 +401,9 @@
     "totalOutstanding": "कुल बकाया",
     "messagesSent": "भेजे गए संदेश",
     "totalCustomers": "कुल ग्राहक",
-    "withPendingDues": "बकाया वाले"
+    "withPendingDues": "बकाया वाले",
+    "quickSend": "त्वरित भेजें",
+    "sendVia": "व्हाट्सएप से भेजें"
   },
   "bulkOps": {
     "title": "आयात/निर्यात",

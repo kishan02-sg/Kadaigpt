@@ -180,7 +180,7 @@ export default function WhatsAppIntegration({ addToast }) {
                 {/* Quick Send */}
                 <div className="card">
                     <div className="card-header">
-                        <h3 className="card-title"><Send size={20} /> Quick Send</h3>
+                        <h3 className="card-title"><Send size={20} /> {t('whatsapp.quickSend', 'Quick Send')}</h3>
                     </div>
                     <div className="quick-send-form">
                         <div className="form-group">
@@ -208,7 +208,7 @@ export default function WhatsAppIntegration({ addToast }) {
                             />
                         </div>
                         <button className="btn btn-success w-full" onClick={handleQuickSend}>
-                            <MessageCircle size={18} /> Send via WhatsApp
+                            <MessageCircle size={18} /> {t('whatsapp.sendVia', 'Send via WhatsApp')}
                         </button>
                     </div>
                 </div>

@@ -102,7 +102,7 @@ export default function StaffManagement({ addToast }) {
                 </div>
                 <button className="add-btn" onClick={() => { setShowAddModal(true); setCreatedStaff(null) }}>
                     <UserPlus size={18} />
-                    Add Staff
+                    {t('staff.addStaff', 'Add Staff')}
                 </button>
             </div>
 
