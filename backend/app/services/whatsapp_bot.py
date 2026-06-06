@@ -35,6 +35,11 @@ class WhatsAppBotService:
         self.api_key = settings.EVOLUTION_API_KEY or "kadaigpt-wa-secret-2026"
         self.session_name = "default"  # WAHA Core only supports 'default' session
         self.store_name = "KadaiGPT Store"
+
+        # Official Meta WhatsApp Cloud API config (preferred when set)
+        self.cloud_token = settings.WHATSAPP_CLOUD_TOKEN
+        self.cloud_phone_id = settings.WHATSAPP_PHONE_NUMBER_ID
+        self.cloud_api_version = settings.WHATSAPP_CLOUD_API_VERSION
         
         # Conversation states for multi-step interactions
         self._conversation_states = {}
@@ -110,38 +115,82 @@ _Pro tip: You can speak in Hindi, Tamil, or English - I understand all!_"""
         
     # ==================== WAHA API METHODS ====================
     
+    @property
+    def provider(self) -> Optional[str]:
+        """Which sending provider is configured: 'cloud' (official Meta), 'evolution', or None.
+        Placeholder/example values are treated as not-configured."""
+        if self.cloud_token and self.cloud_phone_id:
+            return "cloud"
+        url = (settings.EVOLUTION_API_URL or "").strip()
+        placeholder = (not url) or any(
+            p in url for p in ("your-", "example", "localhost", "127.0.0.1", "changeme")
+        )
+        if url and not placeholder:
+            return "evolution"
+        return None
+
+    @property
+    def is_configured(self) -> bool:
+        """True when a real provider is set up for automated sending."""
+        return self.provider is not None
+
     async def send_message(self, phone: str, message: str) -> Dict[str, Any]:
-        """Send a WhatsApp message via WAHA API"""
+        """Send a WhatsApp message via the configured provider (Meta Cloud API
+        preferred, else WAHA/Evolution). Returns {success, data|error}."""
+        if self.provider == "cloud":
+            return await self._send_cloud(phone, message)
+        return await self._send_waha(phone, message)
+
+    async def _send_cloud(self, phone: str, message: str) -> Dict[str, Any]:
+        """Send via the official Meta WhatsApp Cloud API."""
         try:
             clean_phone = self._format_phone(phone)
-            
-            # WAHA API format
+            url = f"https://graph.facebook.com/{self.cloud_api_version}/{self.cloud_phone_id}/messages"
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": clean_phone,
+                "type": "text",
+                "text": {"preview_url": False, "body": message},
+            }
+            headers = {
+                "Authorization": f"Bearer {self.cloud_token}",
+                "Content-Type": "application/json",
+            }
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url, json=payload, headers=headers, timeout=30)
+            if resp.status_code // 100 == 2:
+                logger.info(f"[WA Cloud] message sent to {phone}")
+                return {"success": True, "data": resp.json(), "provider": "cloud"}
+            logger.error(f"[WA Cloud] send failed ({resp.status_code}): {resp.text[:300]}")
+            return {"success": False, "error": resp.text[:300], "provider": "cloud"}
+        except Exception as e:
+            logger.error(f"[WA Cloud] error: {e}")
+            return {"success": False, "error": str(e), "provider": "cloud"}
+
+    async def _send_waha(self, phone: str, message: str) -> Dict[str, Any]:
+        """Send a WhatsApp message via WAHA / Evolution API (self-hosted bridge)."""
+        try:
+            clean_phone = self._format_phone(phone)
             url = f"{self.waha_url}/api/sendText"
-            
             payload = {
                 "session": self.session_name,
                 "chatId": f"{clean_phone}@c.us",
                 "text": message
             }
-            
             headers = {
                 "X-Api-Key": self.api_key,
                 "Content-Type": "application/json"
             }
-            
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, json=payload, headers=headers, timeout=30)
-                
-                if response.status_code == 200 or response.status_code == 201:
-                    logger.info(f"Message sent to {phone}")
-                    return {"success": True, "data": response.json()}
-                else:
-                    logger.error(f"Failed to send message: {response.text}")
-                    return {"success": False, "error": response.text}
-                    
+                if response.status_code in (200, 201):
+                    logger.info(f"[WAHA] message sent to {phone}")
+                    return {"success": True, "data": response.json(), "provider": "evolution"}
+                logger.error(f"[WAHA] failed to send message: {response.text}")
+                return {"success": False, "error": response.text, "provider": "evolution"}
         except Exception as e:
-            logger.error(f"Error sending WhatsApp message: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"[WAHA] error sending message: {e}")
+            return {"success": False, "error": str(e), "provider": "evolution"}
     
     async def send_welcome_message(self, phone: str, user_name: str) -> Dict[str, Any]:
         """Send welcome message to new user"""

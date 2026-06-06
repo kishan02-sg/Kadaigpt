@@ -292,8 +292,11 @@ async def send_welcome(request: WelcomeMessageRequest):
 
 @router.get("/status")
 async def get_connection_status():
-    """Check WhatsApp/Evolution API connection status"""
+    """Check WhatsApp connection status + which automated provider is configured."""
     status = await whatsapp_bot.check_connection()
+    if isinstance(status, dict):
+        status["provider"] = whatsapp_bot.provider          # 'cloud' | 'evolution' | None
+        status["auto_send"] = whatsapp_bot.is_configured     # True when automated sending is available
     return status
 
 

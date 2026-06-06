@@ -3,7 +3,8 @@ KadaiGPT - Bills Router
 Core billing functionality with AI agent integration
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
+from app.services.whatsapp_bot import whatsapp_bot
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from typing import List, Optional
@@ -151,6 +152,7 @@ async def get_bill(
 @router.post("", response_model=BillResponse, status_code=status.HTTP_201_CREATED)
 async def create_bill(
     bill_data: BillCreate,
+    background_tasks: BackgroundTasks,
     auto_print: bool = Query(default=True, description="Automatically print bill"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
@@ -419,8 +421,42 @@ async def create_bill(
         items=raw_items,
         created_at=b["created_at"] or datetime.utcnow(),
     )
-    
+
+    # 📲 Auto-send the bill on WhatsApp (only when a provider is configured and the
+    # customer has a phone). Runs in the background so it never delays the response.
+    if bill_data.customer_phone and whatsapp_bot.is_configured:
+        store_name = localStorage_store_name(current_user) or "KadaiGPT Store"
+        wa_msg = _format_bill_whatsapp(b, raw_items, store_name)
+        background_tasks.add_task(whatsapp_bot.send_message, bill_data.customer_phone, wa_msg)
+
     return response
+
+
+def localStorage_store_name(user) -> str:
+    """Best-effort store name for messages (falls back gracefully)."""
+    try:
+        return getattr(getattr(user, "store", None), "name", None) or ""
+    except Exception:
+        return ""
+
+
+def _format_bill_whatsapp(b: dict, items: list, store_name: str) -> str:
+    """Compose a concise bill message for WhatsApp."""
+    lines = [f"🧾 *{store_name}*", f"Bill: {b['bill_number']}", ""]
+    for it in items[:20]:
+        name = it.get("product_name") or it.get("name") or "Item"
+        qty = it.get("quantity", 1)
+        amt = it.get("total_price") or it.get("unit_price") or 0
+        lines.append(f"• {name} x{qty} — ₹{amt}")
+    lines += [
+        "",
+        f"*Total: ₹{b['total_amount']}*",
+        f"Payment: {b['payment_method']}",
+        "",
+        "Thank you for shopping with us! 🙏",
+        "_Powered by KadaiGPT_",
+    ]
+    return "\n".join(lines)
 
 
 @router.post("/{bill_id}/print", response_model=PrintStatus)

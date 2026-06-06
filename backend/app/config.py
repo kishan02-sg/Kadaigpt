@@ -68,11 +68,18 @@ class Settings(BaseSettings):
     enable_predictive_analytics: bool = True
     enable_whatsapp_integration: bool = True
     
-    # Evolution API (WhatsApp Bot) Settings
+    # Evolution / WAHA API (self-hosted WhatsApp bridge)
     EVOLUTION_API_URL: Optional[str] = None
     EVOLUTION_API_KEY: Optional[str] = None
     EVOLUTION_INSTANCE_NAME: str = "kadaigpt"
     WHATSAPP_VERIFY_TOKEN: str = "kadaigpt_verify_token"
+
+    # Official Meta WhatsApp Cloud API (free tier). Preferred when configured.
+    # WHATSAPP_CLOUD_TOKEN        -> permanent access token from Meta
+    # WHATSAPP_PHONE_NUMBER_ID    -> the WhatsApp Business phone number ID
+    WHATSAPP_CLOUD_TOKEN: Optional[str] = None
+    WHATSAPP_PHONE_NUMBER_ID: Optional[str] = None
+    WHATSAPP_CLOUD_API_VERSION: str = "v21.0"
     
     # Telegram Bot Settings
     TELEGRAM_BOT_TOKEN: Optional[str] = None
