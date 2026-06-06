@@ -20,6 +20,8 @@ from app.config import settings
 from app.models import User, Store, UserRole
 from app.utils.password import validate_password_strength
 from app.services import auth_state
+from app.services.email_service import email_service
+import os
 from app.schemas import (
     Token, TokenData, LoginRequest, RegisterRequest, 
     UserResponse, StoreResponse
@@ -396,8 +398,30 @@ async def forgot_password(
             db, token, user.id, user.email, RESET_TOKEN_EXPIRE_MINUTES
         )
 
-        # Log token for now (production: send via email)
-        logger.info(f"[Password Reset] Token generated for {user.email}")
+        # Email the reset link if SMTP is configured; otherwise log it (dev fallback).
+        app_url = os.getenv("APP_URL", "https://kadaigpt-main.vercel.app").rstrip("/")
+        reset_link = f"{app_url}/#reset-password?token={token}"
+        if email_service.enabled:
+            try:
+                html = f"""
+                <p>Hi {user.full_name or 'there'},</p>
+                <p>We received a request to reset your KadaiGPT password.
+                This link expires in {RESET_TOKEN_EXPIRE_MINUTES} minutes.</p>
+                <p><a href="{reset_link}"
+                   style="background:#ff6b35;color:#fff;padding:10px 18px;border-radius:8px;
+                   text-decoration:none;display:inline-block">Reset Password</a></p>
+                <p>Or use this code: <b>{token}</b></p>
+                <p>If you didn't request this, you can safely ignore this email.</p>
+                """
+                await email_service.send_email_async(
+                    user.email, "Reset your KadaiGPT password", html
+                )
+                logger.info(f"[Password Reset] Email sent to {user.email}")
+            except Exception as e:
+                logger.warning(f"[Password Reset] Email send failed: {type(e).__name__}: {e}")
+        else:
+            # No SMTP configured — log so it's usable in dev/testing.
+            logger.info(f"[Password Reset] (no SMTP) token for {user.email}: {token}")
         # TODO: Send email with reset link
         # await email_service.send_reset_email(user.email, token)
     
