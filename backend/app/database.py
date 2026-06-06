@@ -302,6 +302,18 @@ _SERVERLESS_SCHEMA_STATEMENTS = [
         updated_at TIMESTAMPTZ
     )""",
     "CREATE INDEX IF NOT EXISTS idx_expenses_store_date ON expenses(store_id, expense_date DESC)",
+    # Per-store WhatsApp customer-bot connection config
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS upi_id VARCHAR(100)",
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS wa_provider VARCHAR(20)",
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS wa_cloud_phone_id VARCHAR(64)",
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS wa_session VARCHAR(64)",
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS wa_cloud_token_enc TEXT",
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS wa_evolution_url VARCHAR(255)",
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS wa_evolution_key_enc TEXT",
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS wa_number VARCHAR(20)",
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS wa_connected BOOLEAN DEFAULT false",
+    "CREATE INDEX IF NOT EXISTS idx_stores_wa_phone ON stores(wa_cloud_phone_id)",
+    "CREATE INDEX IF NOT EXISTS idx_stores_wa_session ON stores(wa_session)",
 ]
 
 

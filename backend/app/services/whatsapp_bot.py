@@ -141,11 +141,13 @@ _Pro tip: You can speak in Hindi, Tamil, or English - I understand all!_"""
             return await self._send_cloud(phone, message)
         return await self._send_waha(phone, message)
 
-    async def _send_cloud(self, phone: str, message: str) -> Dict[str, Any]:
-        """Send via the official Meta WhatsApp Cloud API."""
+    async def _send_cloud(self, phone: str, message: str, token: str = None, phone_id: str = None) -> Dict[str, Any]:
+        """Send via the official Meta WhatsApp Cloud API (global creds or per-store overrides)."""
         try:
+            token = token or self.cloud_token
+            phone_id = phone_id or self.cloud_phone_id
             clean_phone = self._format_phone(phone)
-            url = f"https://graph.facebook.com/{self.cloud_api_version}/{self.cloud_phone_id}/messages"
+            url = f"https://graph.facebook.com/{self.cloud_api_version}/{phone_id}/messages"
             payload = {
                 "messaging_product": "whatsapp",
                 "to": clean_phone,
@@ -153,7 +155,7 @@ _Pro tip: You can speak in Hindi, Tamil, or English - I understand all!_"""
                 "text": {"preview_url": False, "body": message},
             }
             headers = {
-                "Authorization": f"Bearer {self.cloud_token}",
+                "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json",
             }
             async with httpx.AsyncClient() as client:
@@ -167,22 +169,25 @@ _Pro tip: You can speak in Hindi, Tamil, or English - I understand all!_"""
             logger.error(f"[WA Cloud] error: {e}")
             return {"success": False, "error": str(e), "provider": "cloud"}
 
-    async def _send_waha(self, phone: str, message: str) -> Dict[str, Any]:
-        """Send a WhatsApp message via WAHA / Evolution API (self-hosted bridge)."""
+    async def _send_waha(self, phone: str, message: str, url: str = None, key: str = None, session: str = None) -> Dict[str, Any]:
+        """Send a WhatsApp message via WAHA / Evolution API (global or per-store overrides)."""
         try:
+            base = (url or self.waha_url).rstrip("/")
+            api_key = key or self.api_key
+            sess = session or self.session_name
             clean_phone = self._format_phone(phone)
-            url = f"{self.waha_url}/api/sendText"
+            send_url = f"{base}/api/sendText"
             payload = {
-                "session": self.session_name,
+                "session": sess,
                 "chatId": f"{clean_phone}@c.us",
                 "text": message
             }
             headers = {
-                "X-Api-Key": self.api_key,
+                "X-Api-Key": api_key,
                 "Content-Type": "application/json"
             }
             async with httpx.AsyncClient() as client:
-                response = await client.post(url, json=payload, headers=headers, timeout=30)
+                response = await client.post(send_url, json=payload, headers=headers, timeout=30)
                 if response.status_code in (200, 201):
                     logger.info(f"[WAHA] message sent to {phone}")
                     return {"success": True, "data": response.json(), "provider": "evolution"}
@@ -508,6 +513,131 @@ _Powered by KadaiGPT AI_ 🤖"""
         # Route to handler
         return await self._route_intent(intent, entities, user_id, phone, original_msg)
     
+    # ════════════════════════════════════════════════════════════════════
+    # CUSTOMER-FACING STOREFRONT BOT
+    # The shop's WhatsApp number is the bot, so inbound senders are CUSTOMERS.
+    # They ask about stock / price / store info; we answer from that store's
+    # live data. (Owner management commands above are unreachable inbound.)
+    # ════════════════════════════════════════════════════════════════════
+
+    _STOP_WORDS = {
+        "is", "are", "do", "does", "you", "have", "got", "the", "a", "an", "any",
+        "available", "availability", "in", "stock", "price", "rate", "cost", "of",
+        "for", "how", "much", "what", "whats", "tell", "me", "there", "this", "that",
+        "today", "now", "pls", "please", "can", "i", "get", "buy", "want", "need",
+        "?", "hai", "kya", "hain", "iruka", "irukka", "iruku", "und", "unda", " unde",
+    }
+
+    def _extract_product_query(self, msg: str) -> str:
+        """Pull the likely product name out of a customer question."""
+        cleaned = re.sub(r"[?¿!.,]", " ", (msg or "").lower())
+        words = [w for w in cleaned.split() if w and w not in self._STOP_WORDS]
+        # numbers/units like '2', 'kg' aren't a product name
+        words = [w for w in words if not w.isdigit() and w not in ("kg", "g", "ltr", "l", "litre", "liter")]
+        return " ".join(words).strip()
+
+    def _is_store_info_query(self, low: str) -> bool:
+        keys = ["timing", "timings", "time", "open", "close", "hours", "address",
+                "location", "where", "phone", "contact", "upi", "payment", "gpay", "shop info"]
+        return any(k in low for k in keys)
+
+    def _is_greeting(self, low: str) -> bool:
+        words = low.split()
+        return len(words) <= 3 and any(
+            g in low for g in ["hi", "hello", "hey", "help", "menu", "start",
+                               "vanakkam", "namaste", "namaskara", "hii"]
+        )
+
+    def _customer_menu(self, store_name: str) -> str:
+        return (
+            f"🙏 Welcome to *{store_name}*!\n\n"
+            "You can ask me:\n"
+            "• *Is rice available?* — check stock\n"
+            "• *Price of sugar* — check price\n"
+            "• *Store timings* — hours & address\n\n"
+            "_Just type an item name to check it._"
+        )
+
+    def _store_info_reply(self, store) -> str:
+        if not store:
+            return "Sorry, store details aren't available right now."
+        parts = [f"🏪 *{store.name}*"]
+        if store.address:
+            parts.append(f"📍 {store.address}")
+        if store.phone:
+            parts.append(f"📞 {store.phone}")
+        if store.opening_time or store.closing_time:
+            parts.append(f"🕒 {store.opening_time or '—'} to {store.closing_time or '—'}")
+        if getattr(store, "upi_id", None):
+            parts.append(f"💳 UPI: {store.upi_id}")
+        return "\n".join(parts)
+
+    def _product_reply(self, products: List, query: str) -> str:
+        lines = []
+        for p in products[:8]:
+            unit = p.unit or "pcs"
+            if (p.current_stock or 0) > 0:
+                lines.append(f"✅ *{p.name}* — available ({p.current_stock} {unit}) at ₹{p.selling_price:g}/{unit}")
+            else:
+                lines.append(f"❌ *{p.name}* — out of stock")
+        more = f"\n…and {len(products) - 8} more" if len(products) > 8 else ""
+        return "\n".join(lines) + more
+
+    async def process_customer_message(self, phone: str, message: str, store_id: int) -> str:
+        """Answer a customer's WhatsApp question from a specific store's live data."""
+        from app.database import async_session_maker
+        from app.models import Product, Store
+
+        msg = (message or "").strip()
+        low = msg.lower()
+        try:
+            async with async_session_maker() as db:
+                store = (await db.execute(select(Store).where(Store.id == store_id))).scalar_one_or_none()
+                store_name = store.name if store else "our shop"
+
+                if self._is_store_info_query(low):
+                    return self._store_info_reply(store)
+                if self._is_greeting(low):
+                    return self._customer_menu(store_name)
+
+                product_name = self._extract_product_query(msg)
+                if not product_name:
+                    return self._customer_menu(store_name)
+
+                result = await db.execute(
+                    select(Product).where(
+                        Product.store_id == store_id,
+                        Product.is_active == True,  # noqa: E712
+                        Product.name.ilike(f"%{product_name}%"),
+                    ).limit(12)
+                )
+                products = result.scalars().all()
+                if products:
+                    return self._product_reply(products, product_name)
+                return (
+                    f"😔 Sorry, we don't have *{product_name}* listed at {store_name} right now.\n"
+                    "Try another item, or type *menu* for help."
+                )
+        except Exception as e:
+            logger.error(f"[WA Customer] error for store {store_id}: {e}")
+            return "Sorry, I couldn't check that right now. Please try again in a moment."
+
+    # ── Store-aware sending (reply via the correct shop's connection) ──────
+    async def send_message_for_store(self, store, phone: str, message: str) -> Dict[str, Any]:
+        """Send a reply using the store's own WhatsApp connection; fall back to global."""
+        try:
+            from app.utils.encryption import data_encryptor
+            if store and store.wa_provider == "cloud" and store.wa_cloud_token_enc and store.wa_cloud_phone_id:
+                token = data_encryptor.decrypt(store.wa_cloud_token_enc)
+                return await self._send_cloud(phone, message, token=token, phone_id=store.wa_cloud_phone_id)
+            if store and store.wa_provider == "evolution" and store.wa_evolution_url:
+                key = data_encryptor.decrypt(store.wa_evolution_key_enc or "")
+                return await self._send_waha(phone, message, url=store.wa_evolution_url,
+                                             key=key, session=store.wa_session or "default")
+        except Exception as e:
+            logger.warning(f"[WA] store-aware send failed, using global: {e}")
+        return await self.send_message(phone, message)
+
     async def _route_intent(self, intent: str, entities: Dict, user_id: Optional[int], phone: str, original_msg: str) -> str:
         """Route to appropriate handler based on intent"""
         

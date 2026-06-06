@@ -38,11 +38,28 @@ class Store(Base):
     # Settings
     currency = Column(String(10), default="INR")
     tax_rate = Column(Float, default=0.0)
-    
+    upi_id = Column(String(100))
+
+    # ── Per-store WhatsApp customer-bot connection ──────────────────────────
+    # provider: 'cloud' (Meta) | 'evolution' (WAHA) | None
+    wa_provider = Column(String(20))
+    # Routing keys used to map an inbound message back to this store:
+    #   Meta  -> wa_cloud_phone_id (= webhook metadata.phone_number_id)
+    #   WAHA  -> wa_session (= webhook session name)
+    wa_cloud_phone_id = Column(String(64), index=True)
+    wa_session = Column(String(64), index=True)
+    # Secrets are stored encrypted (DataEncryption); never returned to the client.
+    wa_cloud_token_enc = Column(Text)
+    wa_evolution_url = Column(String(255))
+    wa_evolution_key_enc = Column(Text)
+    # The connected WhatsApp number shown to customers + connection state
+    wa_number = Column(String(20))
+    wa_connected = Column(Boolean, default=False)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationships
     users = relationship("User", back_populates="store")
     products = relationship("Product", back_populates="store")

@@ -61,7 +61,7 @@ async def waha_webhook(request: Request, background_tasks: BackgroundTasks):
         # WAHA message event
         if event == "message":
             payload = body.get("payload", {})
-            background_tasks.add_task(handle_waha_message, payload)
+            background_tasks.add_task(handle_waha_message, payload, session)
             return {"status": "processing", "event": event}
         
         # WAHA session status
@@ -99,7 +99,48 @@ async def waha_webhook(request: Request, background_tasks: BackgroundTasks):
         return {"status": "error", "message": str(e)}
 
 
-async def handle_waha_message(payload: Dict[str, Any]):
+async def _resolve_store(session: str = None, phone_id: str = None):
+    """Map an inbound message to the store that owns the receiving WhatsApp number.
+    Returns a Store ORM object (detached, columns loaded) or None.
+    """
+    from app.database import async_session_maker
+    from app.models import Store
+    from sqlalchemy import select, or_
+    try:
+        async with async_session_maker() as db:
+            conds = []
+            if session:
+                conds.append(Store.wa_session == session)
+            if phone_id:
+                conds.append(Store.wa_cloud_phone_id == phone_id)
+            if conds:
+                row = await db.execute(select(Store).where(or_(*conds), Store.wa_connected == True))  # noqa: E712
+                store = row.scalars().first()
+                if store:
+                    return store
+            # Single-shop fallback: if exactly one store has WA configured, use it.
+            row = await db.execute(select(Store).where(Store.wa_provider.isnot(None)).limit(2))
+            stores = row.scalars().all()
+            return stores[0] if len(stores) == 1 else None
+    except Exception as e:
+        logger.error(f"[WA] store resolve failed: {e}")
+        return None
+
+
+async def _customer_reply(phone: str, text: str, store) -> None:
+    """Run the customer-facing bot for a resolved store and reply on its connection."""
+    if store:
+        reply = await whatsapp_bot.process_customer_message(phone, text, store.id)
+        if reply:
+            await whatsapp_bot.send_message_for_store(store, phone, reply)
+    else:
+        # No store mapped — fall back to the legacy owner bot (single-tenant)
+        reply = await whatsapp_bot.process_incoming_message(phone, text)
+        if reply:
+            await whatsapp_bot.send_message(phone, reply)
+
+
+async def handle_waha_message(payload: Dict[str, Any], session: str = "default"):
     """Process incoming WAHA WhatsApp message (text, voice, audio)"""
     try:
         # Skip if it's our own message
@@ -140,15 +181,13 @@ async def handle_waha_message(payload: Dict[str, Any]):
             return
             
         logger.info(f"Message from {phone}: {text}")
-        
-        # Process message and get response
-        response = await whatsapp_bot.process_incoming_message(phone, text)
-        
-        # Send response
-        if response:
-            await whatsapp_bot.send_message(phone, response)
-            logger.info(f"Response sent to {phone}")
-            
+
+        # Route to the store that owns this WhatsApp number, then reply as the
+        # customer-facing storefront bot.
+        store = await _resolve_store(session=session)
+        await _customer_reply(phone, text, store)
+        logger.info(f"Response sent to {phone}")
+
     except Exception as e:
         logger.error(f"Error handling WAHA message: {e}")
 
@@ -184,15 +223,11 @@ async def handle_evolution_message(data: Dict[str, Any]):
             return
             
         logger.info(f"Message from {phone}: {text}")
-        
-        # Process message and get response
-        response = await whatsapp_bot.process_incoming_message(phone, text)
-        
-        # Send response
-        if response:
-            await whatsapp_bot.send_message(phone, response)
-            logger.info(f"Response sent to {phone}")
-            
+
+        store = await _resolve_store(session=data.get("instance") or None)
+        await _customer_reply(phone, text, store)
+        logger.info(f"Response sent to {phone}")
+
     except Exception as e:
         logger.error(f"Error handling Evolution message: {e}")
 
@@ -211,18 +246,15 @@ async def handle_legacy_webhook(body: dict) -> dict:
         message = messages[0]
         from_number = message.get("from", "")
         msg_type = message.get("type", "text")
-        
+        # Meta routing key: the receiving business number id
+        phone_number_id = value.get("metadata", {}).get("phone_number_id")
+
         if msg_type == "text":
             text = message.get("text", {}).get("body", "").strip()
-            response = await whatsapp_bot.process_incoming_message(from_number, text)
-            
             logger.info(f"[WhatsApp Bot] From: {from_number}, Message: {text}")
-            
-            return {
-                "status": "processed",
-                "from": from_number,
-                "response": response
-            }
+            store = await _resolve_store(phone_id=phone_number_id)
+            await _customer_reply(from_number, text, store)
+            return {"status": "processed", "from": from_number}
         
         return {"status": "unsupported message type"}
         
