@@ -264,8 +264,56 @@ async def check_db_health() -> dict:
         return {"status": "unhealthy", "error": str(e)[:100]}
 
 
+# ──────────────────────────────────────────────────────────────
+# Serverless self-healing schema
+# init_db() skips all DB work in serverless mode (Vercel), so new columns/tables
+# added in code are never created. This runs the small set of idempotent
+# migrations needed by recent features, once per cold container, on first DB use.
+# ──────────────────────────────────────────────────────────────
+_serverless_schema_ensured = False
+
+# Idempotent statements — safe to run repeatedly. Postgres only.
+_SERVERLESS_SCHEMA_STATEMENTS = [
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens_valid_after TIMESTAMPTZ",
+    """CREATE TABLE IF NOT EXISTS auth_security_state (
+        id SERIAL PRIMARY KEY,
+        kind VARCHAR(20) NOT NULL,
+        key VARCHAR(255) NOT NULL,
+        data JSON,
+        expires_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_auth_security_kind_key ON auth_security_state(kind, key)",
+]
+
+
+async def ensure_serverless_schema():
+    """Apply recent additive migrations on serverless, once per cold start.
+    No-op on SQLite/local (handled by init_db there) and after the first run.
+    """
+    global _serverless_schema_ensured
+    if _serverless_schema_ensured or not is_serverless or is_sqlite:
+        return
+    try:
+        async with engine.begin() as conn:
+            for stmt in _SERVERLESS_SCHEMA_STATEMENTS:
+                try:
+                    await conn.execute(text(stmt))
+                except Exception as e:
+                    logger.debug(f"[Schema] statement skipped: {e}")
+        logger.info("[Schema] Serverless schema ensured")
+    except Exception as e:
+        logger.warning(f"[Schema] ensure failed (continuing): {e}")
+    finally:
+        # Mark done even on failure so we don't retry DDL on every request;
+        # a genuinely missing schema will surface as a clear query error.
+        _serverless_schema_ensured = True
+
+
 async def get_db() -> AsyncSession:
     """Dependency to get database session"""
+    await ensure_serverless_schema()
     async with async_session_maker() as session:
         try:
             yield session
