@@ -195,7 +195,13 @@
     "costPrice": "செலவு விலை",
     "sellingPrice": "விற்பனை விலை",
     "productSaved": "பொருள் சேமிக்கப்பட்டது!",
-    "productDeleted": "பொருள் நீக்கப்பட்டது!"
+    "productDeleted": "பொருள் நீக்கப்பட்டது!",
+    "inventoryManagement": "சரக்கு மேலாண்மை",
+    "subtitle": "சரக்கு அளவைக் கண்காணித்து தயாரிப்புகளை நிர்வகிக்கவும்",
+    "auditLog": "தணிக்கை பதிவு",
+    "totalProducts": "மொத்த தயாரிப்புகள்",
+    "inventoryValue": "சரக்கு மதிப்பு",
+    "lowStockAlerts": "குறைந்த சரக்கு எச்சரிக்கைகள்"
   },
   "customers": {
     "title": "வாடிக்கையாளர்கள்",

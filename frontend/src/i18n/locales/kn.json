@@ -195,7 +195,13 @@
     "costPrice": "ವೆಚ್ಚ ಬೆಲೆ",
     "sellingPrice": "ಮಾರಾಟ ಬೆಲೆ",
     "productSaved": "ಉತ್ಪನ್ನ ಉಳಿಸಲಾಗಿದೆ!",
-    "productDeleted": "ಉತ್ಪನ್ನ ಅಳಿಸಲಾಗಿದೆ!"
+    "productDeleted": "ಉತ್ಪನ್ನ ಅಳಿಸಲಾಗಿದೆ!",
+    "inventoryManagement": "ದಾಸ್ತಾನು ನಿರ್ವಹಣೆ",
+    "subtitle": "ಸ್ಟಾಕ್ ಮಟ್ಟವನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ ಮತ್ತು ಉತ್ಪನ್ನಗಳನ್ನು ನಿರ್ವಹಿಸಿ",
+    "auditLog": "ಆಡಿಟ್ ಲಾಗ್",
+    "totalProducts": "ಒಟ್ಟು ಉತ್ಪನ್ನಗಳು",
+    "inventoryValue": "ದಾಸ್ತಾನು ಮೌಲ್ಯ",
+    "lowStockAlerts": "ಕಡಿಮೆ ಸ್ಟಾಕ್ ಎಚ್ಚರಿಕೆಗಳು"
   },
   "customers": {
     "title": "ಗ್ರಾಹಕರು",

@@ -195,7 +195,13 @@
     "costPrice": "Cost Price",
     "sellingPrice": "Selling Price",
     "productSaved": "Product saved successfully!",
-    "productDeleted": "Product deleted!"
+    "productDeleted": "Product deleted!",
+    "inventoryManagement": "Inventory Management",
+    "subtitle": "Track stock levels and manage your products",
+    "auditLog": "Audit Log",
+    "totalProducts": "Total Products",
+    "inventoryValue": "Inventory Value",
+    "lowStockAlerts": "Low Stock Alerts"
   },
   "customers": {
     "title": "Customers",

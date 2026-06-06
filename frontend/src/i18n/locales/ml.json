@@ -195,7 +195,13 @@
     "costPrice": "ചെലവ് വില",
     "sellingPrice": "വിൽപ്പന വില",
     "productSaved": "ഉൽപ്പന്നം സേവ് ചെയ്തു!",
-    "productDeleted": "ഉൽപ്പന്നം ഇല്ലാതാക്കി!"
+    "productDeleted": "ഉൽപ്പന്നം ഇല്ലാതാക്കി!",
+    "inventoryManagement": "ഇൻവെന്ററി മാനേജ്മെന്റ്",
+    "subtitle": "സ്റ്റോക്ക് ലെവലുകൾ ട്രാക്ക് ചെയ്ത് ഉൽപ്പന്നങ്ങൾ കൈകാര്യം ചെയ്യുക",
+    "auditLog": "ഓഡിറ്റ് ലോഗ്",
+    "totalProducts": "മൊത്തം ഉൽപ്പന്നങ്ങൾ",
+    "inventoryValue": "ഇൻവെന്ററി മൂല്യം",
+    "lowStockAlerts": "കുറഞ്ഞ സ്റ്റോക്ക് അലേർട്ടുകൾ"
   },
   "customers": {
     "title": "ഉപഭോക്താക്കൾ",

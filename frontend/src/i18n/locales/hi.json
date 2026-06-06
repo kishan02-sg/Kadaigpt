@@ -195,7 +195,13 @@
     "costPrice": "लागत मूल्य",
     "sellingPrice": "बिक्री मूल्य",
     "productSaved": "प्रोडक्ट सहेजा गया!",
-    "productDeleted": "प्रोडक्ट हटाया गया!"
+    "productDeleted": "प्रोडक्ट हटाया गया!",
+    "inventoryManagement": "इन्वेंटरी प्रबंधन",
+    "subtitle": "स्टॉक स्तर ट्रैक करें और उत्पाद प्रबंधित करें",
+    "auditLog": "ऑडिट लॉग",
+    "totalProducts": "कुल उत्पाद",
+    "inventoryValue": "इन्वेंटरी मूल्य",
+    "lowStockAlerts": "कम स्टॉक अलर्ट"
   },
   "customers": {
     "title": "ग्राहक",

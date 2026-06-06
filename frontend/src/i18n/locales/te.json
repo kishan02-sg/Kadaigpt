@@ -195,7 +195,13 @@
     "costPrice": "ఖర్చు ధర",
     "sellingPrice": "అమ్మకపు ధర",
     "productSaved": "ఉత్పత్తి సేవ్ అయింది!",
-    "productDeleted": "ఉత్పత్తి తొలగించబడింది!"
+    "productDeleted": "ఉత్పత్తి తొలగించబడింది!",
+    "inventoryManagement": "ఇన్వెంటరీ నిర్వహణ",
+    "subtitle": "స్టాక్ స్థాయిలను ట్రాక్ చేసి ఉత్పత్తులను నిర్వహించండి",
+    "auditLog": "ఆడిట్ లాగ్",
+    "totalProducts": "మొత్తం ఉత్పత్తులు",
+    "inventoryValue": "ఇన్వెంటరీ విలువ",
+    "lowStockAlerts": "తక్కువ స్టాక్ హెచ్చరికలు"
   },
   "customers": {
     "title": "కస్టమర్లు",

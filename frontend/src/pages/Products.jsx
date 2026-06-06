@@ -219,14 +219,14 @@ export default function Products({ addToast, setCurrentPage }) {
         <div className="products-page">
             <div className="page-header">
                 <div>
-                    <h1 className="page-title">📦 Inventory Management</h1>
-                    <p className="page-subtitle">Track stock levels and manage your products</p>
+                    <h1 className="page-title">📦 {t('products.inventoryManagement', 'Inventory Management')}</h1>
+                    <p className="page-subtitle">{t('products.subtitle', 'Track stock levels and manage your products')}</p>
                 </div>
                 <button className="btn btn-ghost" onClick={() => setShowAuditLog(true)} style={{ marginRight: 8 }}>
-                    📋 Audit Log
+                    📋 {t('products.auditLog', 'Audit Log')}
                 </button>
                 <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-                    <Plus size={18} /> Add Product
+                    <Plus size={18} /> {t('products.addProduct', 'Add Product')}
                 </button>
             </div>
 
@@ -236,28 +236,28 @@ export default function Products({ addToast, setCurrentPage }) {
                     <Package size={24} />
                     <div>
                         <span className="stat-value">{products.length}</span>
-                        <span className="stat-label">Total Products</span>
+                        <span className="stat-label">{t('products.totalProducts', 'Total Products')}</span>
                     </div>
                 </div>
                 <div className="stat-card">
                     <BarChart3 size={24} />
                     <div>
                         <span className="stat-value">₹{totalValue.toLocaleString('en-IN')}</span>
-                        <span className="stat-label">Inventory Value</span>
+                        <span className="stat-label">{t('products.inventoryValue', 'Inventory Value')}</span>
                     </div>
                 </div>
                 <div className="stat-card warning" onClick={() => setShowLowStock(!showLowStock)} style={{ cursor: 'pointer' }}>
                     <AlertTriangle size={24} />
                     <div>
                         <span className="stat-value">{lowStockProducts.length}</span>
-                        <span className="stat-label">Low Stock Alerts</span>
+                        <span className="stat-label">{t('products.lowStockAlerts', 'Low Stock Alerts')}</span>
                     </div>
                 </div>
                 <div className="stat-card error">
                     <TrendingDown size={24} />
                     <div>
                         <span className="stat-value">{outOfStock}</span>
-                        <span className="stat-label">Out of Stock</span>
+                        <span className="stat-label">{t('products.outOfStock', 'Out of Stock')}</span>
                     </div>
                 </div>
             </div>
@@ -278,7 +278,7 @@ export default function Products({ addToast, setCurrentPage }) {
                     <input
                         type="text"
                         className="form-input"
-                        placeholder="Search products by name or SKU..."
+                        placeholder={t('products.search', 'Search products by name or SKU...')}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
