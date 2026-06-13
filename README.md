@@ -133,39 +133,64 @@ Supports: **Tamil, Hindi, Telugu, Kannada, Malayalam, English**
 git clone https://github.com/yourusername/KadaiGPT.git
 cd KadaiGPT
 
-# Frontend
-cd frontend && npm install && npm run build && cd ..
+# Backend — terminal 1 (FastAPI on :8000, SQLite locally)
+cd backend
+pip install -r requirements.txt
+cp .env.example .env              # add GOOGLE_API_KEY etc.
+set PYTHONIOENCODING=utf-8        # Windows: required, or emoji in logs crash
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
-# Backend
-cd backend && pip install -r requirements.txt
-cp .env.example .env  # Add your API keys
-
-# Run (serves both frontend & API)
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Frontend — terminal 2 (Vite dev server on :5173, proxies /api to :8000)
+cd frontend
+npm install
+npm run dev
 ```
 
-**Open http://localhost:8000** 🎉
+**Open http://localhost:5173** 🎉 — register a new store from the Login screen (no seeded demo account; Owner sign-up creates your store + first user).
+
+For a single-server production-style run, build the frontend and let FastAPI serve it:
+```bash
+cd frontend && npm run build      # outputs frontend/dist
+cd ../backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
 
 ---
 
-## 📱 Demo Credentials
+## 🔐 Roles & Staff Access
 
-| Mode | Username | Password |
-|------|----------|----------|
-| Demo | Click "Try Demo Mode" | No password needed |
-| Admin | admin | admin123 |
+After registering as Owner, go to **Settings → Staff Management** to add Staff (Cashier, Inventory Manager, etc.) — each gets a Staff ID for the dedicated staff-login tab. Roles are enforced both in the UI (per-role navigation) and on every API endpoint (RBAC).
 
 ---
 
-## 🌐 Deploy (Railway - FREE)
+## 🧪 Testing
 
-1. Push to GitHub
-2. Go to [railway.app](https://railway.app)
-3. Deploy from GitHub
-4. Add environment variables:
-   - `SECRET_KEY` = your-secret
-   - `GOOGLE_API_KEY` = gemini-api-key
-5. Done! 🚀
+```bash
+# Backend unit/integration tests (pytest)
+cd backend && pytest
+
+# Frontend E2E (Playwright — desktop chromium + mobile/Pixel 5 viewport)
+cd frontend && npm run test:e2e
+cd frontend && npm run test:e2e:ui   # interactive UI mode
+```
+
+---
+
+## 🌐 Deploy (Vercel + Supabase)
+
+KadaiGPT ships as a **single Vercel deployment** — `vercel.json` builds the React app to `frontend/dist` and runs the FastAPI backend as a serverless function (`api/index.py`) behind `/api/*`.
+
+1. Push to GitHub, then [import the repo on Vercel](https://vercel.com/new)
+2. Create a free [Supabase](https://supabase.com) Postgres project and copy the **Transaction Pooler** connection string (port 6543)
+3. In Vercel → Project Settings → Environment Variables, set for **both Production and Preview**:
+
+   | Variable | Value |
+   |----------|-------|
+   | `DATABASE_URL` | Supabase pooler connection string |
+   | `SECRET_KEY` / `JWT_SECRET_KEY` | strong random values — app fails to boot without them in production |
+   | `GOOGLE_API_KEY` | Gemini API key (OCR & AI features) |
+   | `APP_ENV` | `production` |
+
+4. Deploy — Vercel runs `cd frontend && npm install && npm run build`, then serves `/api/*` from `api/index.py` and everything else from `frontend/dist`
 
 ---
 
@@ -217,6 +242,6 @@ MIT License - Open Source for Bharat 🇮🇳
 
 **Built with ❤️ for Indian Retail**
 
-[Live Demo](https://kadaigpt.up.railway.app) • [API Docs](/api/docs) • [Video Demo](#)
+[Live Demo](https://kadaigpt.vercel.app) • [API Docs](/api/docs) • [Video Demo](#)
 
 </div>

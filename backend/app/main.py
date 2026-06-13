@@ -141,20 +141,6 @@ ALLOWED_ORIGINS = [
     "https://kadaigpt.onrender.com",
 ]
 
-# In development, allow all origins for convenience
-if settings.app_env == "development":
-    ALLOWED_ORIGINS.append("*")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
-    expose_headers=["X-Request-ID", "X-Response-Time"],
-)
-
-
 # ═══════════════════════════════════════════════════════════════════
 # Security Middleware — Pure ASGI (no BaseHTTPMiddleware)
 # BaseHTTPMiddleware / @app.middleware("http") run handlers in a threadpool,
@@ -251,6 +237,20 @@ class SecurityASGIMiddleware:
         await self.app(scope, receive, send_with_headers)
 
 app.add_middleware(SecurityASGIMiddleware)
+
+# CORSMiddleware is registered after SecurityASGIMiddleware so it wraps it
+# (Starlette applies the last-added middleware outermost). This ensures CORS
+# headers are present even on responses SecurityASGIMiddleware short-circuits
+# (e.g. 429 rate-limit responses) — otherwise the browser reports those as
+# CORS failures ("Failed to fetch") instead of the real error.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["*"],
+    expose_headers=["X-Request-ID", "X-Response-Time"],
+)
 
 
 # API Health check endpoint — production-grade

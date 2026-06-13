@@ -43,6 +43,8 @@ logs/
 .pytest_cache/
 htmlcov/
 coverage/
+frontend/playwright-report/
+frontend/test-results/
 
 # Build output
 frontend/dist/

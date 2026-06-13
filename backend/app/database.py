@@ -158,19 +158,47 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
     logger.info("[Database] Tables created successfully!")
     
-    # Only run migrations and indexes on PostgreSQL
+    # Run migrations and indexes (run_migrations handles SQLite vs PostgreSQL internally)
+    await run_migrations()
     if not is_sqlite:
-        await run_migrations()
         await create_indexes()
-    
+
     _db_initialized = True
 
+
+# Columns that may be missing from a pre-existing table on either PostgreSQL
+# or SQLite. Each entry is (table, column, sqlite_column_def) — the SQLite
+# definition is used with "ALTER TABLE ... ADD COLUMN" (SQLite has no
+# "IF NOT EXISTS" for columns, so we check PRAGMA table_info first).
+_ADDITIVE_COLUMNS = [
+    ("customers", "deleted_at", "TIMESTAMP"),
+    ("customers", "loyalty_points", "INTEGER DEFAULT 0"),
+    ("customers", "last_purchase", "TIMESTAMP"),
+    ("users", "tokens_valid_after", "TIMESTAMP"),
+]
 
 
 async def run_migrations():
     """Run lightweight migrations to add missing columns to existing tables.
-    These use PostgreSQL-specific DO $$ blocks and are skipped on SQLite.
+
+    PostgreSQL uses DO $$ ... END $$ blocks (duplicate_column is caught).
+    SQLite has no "ADD COLUMN IF NOT EXISTS", so we check PRAGMA table_info
+    for each table and only add columns that are actually missing.
     """
+    if is_sqlite:
+        try:
+            async with engine.begin() as conn:
+                for table, column, sqlite_def in _ADDITIVE_COLUMNS:
+                    result = await conn.execute(text(f"PRAGMA table_info({table})"))
+                    existing_columns = {row[1] for row in result.fetchall()}
+                    if column not in existing_columns:
+                        await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {sqlite_def}"))
+                        logger.info(f"[Database] Added missing column {table}.{column}")
+            logger.info(f"[Database] {len(_ADDITIVE_COLUMNS)} migrations checked (SQLite)")
+        except Exception as e:
+            logger.warning(f"[Database] Migrations skipped: {e}")
+        return
+
     migration_statements = [
         # Add deleted_at to customers if missing (soft delete support)
         """DO $$ BEGIN
