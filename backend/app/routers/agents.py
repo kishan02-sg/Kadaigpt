@@ -1,14 +1,24 @@
 """
 KadaiGPT - Advanced AI Agents API Router
 Full API for autonomous AI agent ecosystem
+
+All endpoints are authenticated and scoped to the logged-in user's store.
+Store Manager / Inventory / Analytics agents run against real store data.
+Customer / Voice / Learning / Workflow agents are still demo-only and are
+labeled as such (`is_demo: true`) until they are wired to live data.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
 from datetime import datetime
-import asyncio
-import json
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.database import get_db
+from app.models import User, Store
+from app.routers.auth import get_current_active_user
 
 from ..agents.core.base_agent import AgentOrchestrator, AgentGoal
 from ..agents.core.store_manager_agent import StoreManagerAgent
@@ -21,8 +31,8 @@ from ..agents.core.workflow_engine import WorkflowEngine
 
 router = APIRouter(prefix="/agents", tags=["AI Agents"])
 
-# Store agent instances (in production, would use dependency injection + Redis)
-agent_instances: Dict[int, Dict] = {}
+# Agents that still run on simulated/demo data rather than this store's real records
+DEMO_AGENTS = {"customer", "voice", "learning", "workflow"}
 
 
 # ==================== Request/Response Models ====================
@@ -91,50 +101,68 @@ class WhatsAppIncomingMessage(BaseModel):
 
 # ==================== Helper Functions ====================
 
-def get_store_agents(store_id: int) -> Dict:
-    """Get or create all agents for a store"""
-    if store_id not in agent_instances:
-        store_name = "KadaiGPT Store"
-        
-        # Create all agents
-        agents = {
-            "orchestrator": AgentOrchestrator(store_id),
-            "store_manager": StoreManagerAgent(store_id, store_name),
-            "inventory": InventoryAgent(store_id),
-            "customer": CustomerEngagementAgent(store_id, store_name),
-            "analytics": AnalyticsAgent(store_id),
-            "voice": VoiceAIAgent(store_id),
-            "learning": LearningAgent(store_id),
-            "workflow": WorkflowEngine(store_id)
-        }
-        
-        # Register agents with orchestrator
-        orchestrator = agents["orchestrator"]
-        orchestrator.register_agent(agents["store_manager"])
-        orchestrator.register_agent(agents["inventory"])
-        orchestrator.register_agent(agents["customer"])
-        orchestrator.register_agent(agents["analytics"])
-        orchestrator.register_agent(agents["voice"])
-        orchestrator.register_agent(agents["learning"])
-        
-        agent_instances[store_id] = agents
-    
-    return agent_instances[store_id]
+async def get_store_agents(store_id: int, db: AsyncSession) -> Dict:
+    """
+    Build a fresh set of AI agent instances scoped to one store.
+
+    Agents are created per-request (not cached globally) because the
+    Store Manager / Inventory / Analytics agents hold a reference to the
+    request-scoped DB session - caching them across requests would leak
+    closed sessions in the serverless environment.
+    """
+    store_result = await db.execute(select(Store).where(Store.id == store_id))
+    store = store_result.scalar_one_or_none()
+    store_name = store.name if store else "My Store"
+
+    agents = {
+        "orchestrator": AgentOrchestrator(store_id),
+        "store_manager": StoreManagerAgent(store_id, store_name, db),
+        "inventory": InventoryAgent(store_id, db),
+        "customer": CustomerEngagementAgent(store_id, store_name),
+        "analytics": AnalyticsAgent(store_id, db),
+        "voice": VoiceAIAgent(store_id),
+        "learning": LearningAgent(store_id),
+        "workflow": WorkflowEngine(store_id)
+    }
+
+    orchestrator = agents["orchestrator"]
+    orchestrator.register_agent(agents["store_manager"])
+    orchestrator.register_agent(agents["inventory"])
+    orchestrator.register_agent(agents["customer"])
+    orchestrator.register_agent(agents["analytics"])
+    orchestrator.register_agent(agents["voice"])
+    orchestrator.register_agent(agents["learning"])
+
+    return agents
+
+
+def _mark_demo(data: Any, agent_name: str) -> Any:
+    """Tag responses from agents that still run on simulated data."""
+    if agent_name not in DEMO_AGENTS:
+        return data
+    note = "Demo data - this agent isn't connected to your store's live data yet"
+    if isinstance(data, dict):
+        return {**data, "is_demo": True, "demo_note": note}
+    return {"is_demo": True, "demo_note": note, "result": data}
 
 
 # ==================== Core Agent Endpoints ====================
 
 @router.post("/query", response_model=AgentQueryResponse)
-async def query_agent(request: AgentQueryRequest, store_id: int = 1):
+async def query_agent(
+    request: AgentQueryRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
     """
     Send a natural language query to any AI agent.
-    Available agents: store_manager, inventory, customer, analytics, voice
+    Available agents: store_manager, inventory, customer, analytics, voice, learning
     """
     start_time = datetime.now()
-    
+
     try:
-        agents = get_store_agents(store_id)
-        
+        agents = await get_store_agents(current_user.store_id, db)
+
         agent_map = {
             "store_manager": agents["store_manager"],
             "inventory": agents["inventory"],
@@ -143,61 +171,69 @@ async def query_agent(request: AgentQueryRequest, store_id: int = 1):
             "voice": agents["voice"],
             "learning": agents["learning"]
         }
-        
+
         agent = agent_map.get(request.agent_type)
         if not agent:
             raise HTTPException(status_code=404, detail=f"Agent '{request.agent_type}' not found")
-        
+
         goal = AgentGoal(
             id=f"query_{datetime.now().timestamp()}",
             description=request.message,
             priority=1
         )
-        
+
         if request.context:
             agent.memory.context.update(request.context)
-        
+
         result = await agent.run(goal)
-        
+
         # Record for learning
         await agents["learning"].process_interaction({
             "action_type": "query",
             "agent": request.agent_type,
             "query": request.message
         })
-        
+
         processing_time = (datetime.now() - start_time).total_seconds() * 1000
-        
+
         return AgentQueryResponse(
             success=True,
             agent=request.agent_type,
-            response=result,
+            response=_mark_demo(result, request.agent_type),
             actions_taken=len(agent.action_history),
             processing_time_ms=int(processing_time)
         )
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/status")
-async def get_all_agents_status(store_id: int = 1):
-    """Get status of all AI agents"""
-    agents = get_store_agents(store_id)
-    
+async def get_all_agents_status(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get status of all AI agents for the current store"""
+    agents = await get_store_agents(current_user.store_id, db)
+
     statuses = {}
     for name, agent in agents.items():
         if hasattr(agent, 'get_status'):
-            statuses[name] = agent.get_status()
+            status = agent.get_status()
+            status["is_demo"] = name in DEMO_AGENTS
+            statuses[name] = status
         elif name == "workflow":
             statuses[name] = {
                 "name": "WorkflowEngine",
                 "workflows_count": len(agent.workflows),
-                "active_events": len(agent.event_handlers)
+                "active_events": len(agent.event_handlers),
+                "is_demo": True
             }
-    
+
     return {
-        "store_id": store_id,
+        "store_id": current_user.store_id,
         "agents": statuses,
         "agent_count": len(statuses),
         "timestamp": datetime.now().isoformat()
@@ -205,13 +241,16 @@ async def get_all_agents_status(store_id: int = 1):
 
 
 @router.get("/suggestions")
-async def get_proactive_suggestions(store_id: int = 1):
-    """Get proactive suggestions from Store Manager"""
-    agents = get_store_agents(store_id)
+async def get_proactive_suggestions(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get proactive suggestions from the Store Manager based on real store data"""
+    agents = await get_store_agents(current_user.store_id, db)
     store_manager = agents["store_manager"]
-    
+
     suggestions = await store_manager.get_proactive_suggestions()
-    
+
     return {
         "suggestions": suggestions,
         "count": len(suggestions),
@@ -219,25 +258,31 @@ async def get_proactive_suggestions(store_id: int = 1):
     }
 
 
-# ==================== Voice Agent Endpoints ====================
+# ==================== Voice Agent Endpoints (demo) ====================
 
 @router.post("/voice/command")
-async def process_voice_command(request: VoiceCommandRequest, store_id: int = 1):
+async def process_voice_command(
+    request: VoiceCommandRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Process a voice command (transcribed text)"""
-    agents = get_store_agents(store_id)
+    agents = await get_store_agents(current_user.store_id, db)
     voice_agent = agents["voice"]
-    
+
     result = await voice_agent.process_voice_input(request.text, request.language)
-    
-    return result
+    return _mark_demo(result, "voice")
 
 
 @router.get("/voice/languages")
-async def get_supported_languages(store_id: int = 1):
+async def get_supported_languages(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Get supported languages for voice interface"""
-    agents = get_store_agents(store_id)
+    agents = await get_store_agents(current_user.store_id, db)
     voice_agent = agents["voice"]
-    
+
     return {
         "languages": voice_agent.supported_languages,
         "default": "en"
@@ -247,302 +292,358 @@ async def get_supported_languages(store_id: int = 1):
 # ==================== Analytics Agent Endpoints ====================
 
 @router.get("/analytics/forecast")
-async def get_sales_forecast(days_ahead: int = 7, store_id: int = 1):
-    """Get AI-powered sales forecast"""
-    agents = get_store_agents(store_id)
-    analytics = agents["analytics"]
-    
-    forecast = await analytics._forecast_sales(days_ahead)
-    return forecast
+async def get_sales_forecast(
+    days_ahead: int = 7,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get AI-powered sales forecast based on this store's sales history"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["analytics"]._forecast_sales(days_ahead)
 
 
 @router.get("/analytics/trends")
-async def analyze_trends(metric: str = "sales", period: str = "month", store_id: int = 1):
-    """Analyze sales and business trends"""
-    agents = get_store_agents(store_id)
-    analytics = agents["analytics"]
-    
-    trends = await analytics._analyze_trends(metric, period)
-    return trends
+async def analyze_trends(
+    metric: str = "sales",
+    period: str = "month",
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Analyze sales and business trends for this store"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["analytics"]._analyze_trends(metric, period)
 
 
 @router.get("/analytics/anomalies")
-async def detect_anomalies(sensitivity: str = "medium", store_id: int = 1):
-    """Detect unusual patterns and anomalies"""
-    agents = get_store_agents(store_id)
-    analytics = agents["analytics"]
-    
-    anomalies = await analytics._detect_anomalies(sensitivity)
-    return anomalies
+async def detect_anomalies(
+    sensitivity: str = "medium",
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Detect unusual patterns and anomalies in this store's sales"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["analytics"]._detect_anomalies(sensitivity)
 
 
 @router.get("/analytics/insights")
-async def get_ai_insights(store_id: int = 1):
-    """Get AI-generated business insights"""
-    agents = get_store_agents(store_id)
-    analytics = agents["analytics"]
-    
-    insights = await analytics._generate_insights()
-    return insights
+async def get_ai_insights(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get AI-generated business insights for this store"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["analytics"]._generate_insights()
 
 
 @router.get("/analytics/customers/segments")
-async def get_customer_segments(store_id: int = 1):
-    """Get customer segmentation analysis"""
-    agents = get_store_agents(store_id)
-    analytics = agents["analytics"]
-    
-    segments = await analytics._segment_customers()
-    return segments
+async def get_customer_segments(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get customer segmentation analysis for this store"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["analytics"]._segment_customers()
 
 
 @router.post("/analytics/what-if")
-async def analyze_what_if_scenario(request: WhatIfRequest, store_id: int = 1):
-    """Analyze what-if scenarios"""
-    agents = get_store_agents(store_id)
-    analytics = agents["analytics"]
-    
-    analysis = await analytics._what_if_analysis(request.scenario)
-    return analysis
+async def analyze_what_if_scenario(
+    request: WhatIfRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Analyze what-if scenarios against this store's real sales baseline"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["analytics"]._what_if_analysis(request.scenario)
 
 
 @router.get("/analytics/peak-hours")
-async def get_peak_hour_analysis(store_id: int = 1):
-    """Get peak hour analysis and staffing recommendations"""
-    agents = get_store_agents(store_id)
-    analytics = agents["analytics"]
-    
-    analysis = await analytics._peak_hour_analysis()
-    return analysis
+async def get_peak_hour_analysis(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get peak hour analysis and staffing recommendations for this store"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["analytics"]._peak_hour_analysis()
 
 
 # ==================== Inventory Agent Endpoints ====================
 
 @router.get("/inventory/analysis")
-async def get_inventory_analysis(store_id: int = 1):
-    """Get comprehensive inventory analysis"""
-    agents = get_store_agents(store_id)
-    inventory = agents["inventory"]
-    
-    analysis = await inventory.run_daily_analysis()
-    return analysis
+async def get_inventory_analysis(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get comprehensive inventory analysis for this store"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["inventory"].run_daily_analysis()
 
 
 @router.get("/inventory/predictions")
-async def get_demand_predictions(days_ahead: int = 7, store_id: int = 1):
-    """Get demand predictions for products"""
-    agents = get_store_agents(store_id)
-    inventory = agents["inventory"]
-    
-    predictions = await inventory._predict_stock_needs(days_ahead)
-    return predictions
+async def get_demand_predictions(
+    days_ahead: int = 7,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get demand predictions for this store's products"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["inventory"]._predict_stock_needs(days_ahead)
 
 
 @router.get("/inventory/reorder")
-async def get_reorder_suggestions(store_id: int = 1):
-    """Get optimized reorder list"""
-    agents = get_store_agents(store_id)
-    inventory = agents["inventory"]
-    
-    reorder = await inventory._generate_reorder_list()
-    return reorder
+async def get_reorder_suggestions(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get an optimized reorder list based on this store's stock levels"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["inventory"]._generate_reorder_list()
 
 
 @router.get("/inventory/slow-movers")
-async def get_slow_movers(days: int = 30, store_id: int = 1):
-    """Identify slow-moving inventory"""
-    agents = get_store_agents(store_id)
-    inventory = agents["inventory"]
-    
-    slow_movers = await inventory._identify_slow_movers(days)
-    return slow_movers
+async def get_slow_movers(
+    days: int = 30,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Identify slow-moving inventory for this store"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["inventory"]._identify_slow_movers(days)
 
 
 @router.get("/inventory/price-optimization")
-async def get_price_optimization(store_id: int = 1):
-    """Get AI price optimization suggestions"""
-    agents = get_store_agents(store_id)
-    inventory = agents["inventory"]
-    
-    suggestions = await inventory._suggest_price_optimization()
-    return suggestions
+async def get_price_optimization(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get AI price optimization suggestions for this store"""
+    agents = await get_store_agents(current_user.store_id, db)
+    return await agents["inventory"]._suggest_price_optimization()
 
 
-# ==================== Customer Agent Endpoints ====================
+# ==================== Customer Agent Endpoints (demo) ====================
 
 @router.post("/customer/whatsapp/incoming")
-async def handle_whatsapp_message(message: WhatsAppIncomingMessage, store_id: int = 1):
-    """Handle incoming WhatsApp message"""
-    agents = get_store_agents(store_id)
+async def handle_whatsapp_message(
+    message: WhatsAppIncomingMessage,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle an incoming WhatsApp message (demo customer agent)"""
+    agents = await get_store_agents(current_user.store_id, db)
     customer = agents["customer"]
-    
+
     msg = CustomerMessage(
         phone=message.phone,
         message=message.message,
         timestamp=message.timestamp or datetime.now(),
         message_type=message.message_type
     )
-    
+
     response = await customer.process_incoming_message(msg)
-    return response
+    return _mark_demo(response, "customer")
 
 
 @router.post("/customer/campaign")
-async def send_campaign(request: BulkCampaignRequest, store_id: int = 1):
-    """Send bulk marketing campaign"""
-    agents = get_store_agents(store_id)
+async def send_campaign(
+    request: BulkCampaignRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Send a bulk marketing campaign (demo customer agent)"""
+    agents = await get_store_agents(current_user.store_id, db)
     customer = agents["customer"]
-    
+
     customers = [{"phone": phone} for phone in request.customer_phones]
     results = await customer.send_bulk_campaign(request.campaign_type, customers)
-    return results
+    return _mark_demo(results, "customer")
 
 
 @router.get("/customer/engagement-stats")
-async def get_engagement_stats(store_id: int = 1):
-    """Get customer engagement analytics"""
-    agents = get_store_agents(store_id)
+async def get_engagement_stats(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get customer engagement analytics (demo customer agent)"""
+    agents = await get_store_agents(current_user.store_id, db)
     customer = agents["customer"]
-    
+
     stats = await customer.get_engagement_analytics()
-    return stats
+    return _mark_demo(stats, "customer")
 
 
-# ==================== Learning Agent Endpoints ====================
+# ==================== Learning Agent Endpoints (demo) ====================
 
 @router.post("/learning/feedback")
-async def submit_feedback(request: FeedbackRequest, store_id: int = 1):
-    """Submit feedback on agent action"""
-    agents = get_store_agents(store_id)
+async def submit_feedback(
+    request: FeedbackRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Submit feedback on an agent action (demo learning agent)"""
+    agents = await get_store_agents(current_user.store_id, db)
     learning = agents["learning"]
-    
+
     result = await learning._record_feedback(
         request.action_id,
         request.rating,
         request.helpful,
         request.comment
     )
-    return result
+    return _mark_demo(result, "learning")
 
 
 @router.post("/learning/correction")
-async def submit_correction(request: CorrectionRequest, store_id: int = 1):
-    """Submit correction for agent to learn"""
-    agents = get_store_agents(store_id)
+async def submit_correction(
+    request: CorrectionRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Submit a correction for the agent to learn from (demo learning agent)"""
+    agents = await get_store_agents(current_user.store_id, db)
     learning = agents["learning"]
-    
+
     result = await learning._learn_correction(
         request.original,
         request.correction,
         request.context
     )
-    return result
+    return _mark_demo(result, "learning")
 
 
 @router.get("/learning/stats")
-async def get_learning_stats(store_id: int = 1):
-    """Get learning statistics"""
-    agents = get_store_agents(store_id)
+async def get_learning_stats(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get learning statistics (demo learning agent)"""
+    agents = await get_store_agents(current_user.store_id, db)
     learning = agents["learning"]
-    
+
     stats = await learning._get_learning_stats()
-    return stats
+    return _mark_demo(stats, "learning")
 
 
 @router.get("/learning/patterns")
-async def get_learned_patterns(store_id: int = 1):
-    """Get behavior patterns learned by the agent"""
-    agents = get_store_agents(store_id)
+async def get_learned_patterns(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get behavior patterns learned by the agent (demo learning agent)"""
+    agents = await get_store_agents(current_user.store_id, db)
     learning = agents["learning"]
-    
+
     patterns = await learning._analyze_behavior_patterns()
-    return patterns
+    return _mark_demo(patterns, "learning")
 
 
 @router.get("/learning/personalized")
-async def get_personalized_suggestions(store_id: int = 1):
-    """Get personalized suggestions based on learned preferences"""
-    agents = get_store_agents(store_id)
+async def get_personalized_suggestions(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get personalized suggestions based on learned preferences (demo learning agent)"""
+    agents = await get_store_agents(current_user.store_id, db)
     learning = agents["learning"]
-    
+
     suggestions = await learning._get_personalized_suggestion()
-    return suggestions
+    return _mark_demo(suggestions, "learning")
 
 
-# ==================== Workflow Endpoints ====================
+# ==================== Workflow Endpoints (demo) ====================
 
 @router.get("/workflows")
-async def list_workflows(store_id: int = 1):
-    """List all registered workflows"""
-    agents = get_store_agents(store_id)
+async def list_workflows(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all registered workflows (demo workflow engine)"""
+    agents = await get_store_agents(current_user.store_id, db)
     workflow_engine = agents["workflow"]
-    
+
     workflows = workflow_engine.get_all_workflows()
-    return {
+    return _mark_demo({
         "workflows": workflows,
         "count": len(workflows)
-    }
+    }, "workflow")
 
 
 @router.post("/workflows/execute")
-async def execute_workflow(request: WorkflowExecuteRequest, store_id: int = 1):
-    """Execute a workflow manually"""
-    agents = get_store_agents(store_id)
+async def execute_workflow(
+    request: WorkflowExecuteRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Execute a workflow manually (demo workflow engine)"""
+    agents = await get_store_agents(current_user.store_id, db)
     workflow_engine = agents["workflow"]
-    
+
     result = await workflow_engine.execute_workflow(
         request.workflow_id,
         request.context
     )
-    return result
+    return _mark_demo(result, "workflow")
 
 
 @router.post("/workflows/{workflow_id}/toggle")
-async def toggle_workflow(workflow_id: str, enabled: bool, store_id: int = 1):
-    """Enable or disable a workflow"""
-    agents = get_store_agents(store_id)
+async def toggle_workflow(
+    workflow_id: str,
+    enabled: bool,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Enable or disable a workflow (demo workflow engine)"""
+    agents = await get_store_agents(current_user.store_id, db)
     workflow_engine = agents["workflow"]
-    
+
     success = workflow_engine.toggle_workflow(workflow_id, enabled)
-    
+
     if success:
-        return {"status": "success", "workflow_id": workflow_id, "enabled": enabled}
+        return _mark_demo({"status": "success", "workflow_id": workflow_id, "enabled": enabled}, "workflow")
     else:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
 
 @router.post("/workflows/trigger-event")
-async def trigger_workflow_event(event: str, data: Dict = None, store_id: int = 1):
-    """Trigger an event to execute matching workflows"""
-    agents = get_store_agents(store_id)
+async def trigger_workflow_event(
+    event: str,
+    data: Optional[Dict] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Trigger an event to execute matching workflows (demo workflow engine)"""
+    agents = await get_store_agents(current_user.store_id, db)
     workflow_engine = agents["workflow"]
-    
+
     results = await workflow_engine.trigger_event(event, data or {})
-    return {
+    return _mark_demo({
         "event": event,
         "workflows_triggered": len(results),
         "results": results
-    }
+    }, "workflow")
 
 
 # ==================== Multi-Agent Orchestration ====================
 
 @router.post("/orchestrate")
-async def orchestrate_multi_agent_task(request: AgentQueryRequest, store_id: int = 1):
+async def orchestrate_multi_agent_task(
+    request: AgentQueryRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
     """
     Orchestrate a complex task across multiple agents.
     The Store Manager will coordinate other agents as needed.
     """
     start_time = datetime.now()
-    agents = get_store_agents(store_id)
-    
+    agents = await get_store_agents(current_user.store_id, db)
+
     store_manager = agents["store_manager"]
-    
+
     # Process through store manager (it will delegate to others)
     result = await store_manager.process_natural_language(request.message)
-    
+
     processing_time = (datetime.now() - start_time).total_seconds() * 1000
-    
+
     return {
         "success": True,
         "orchestrator": "StoreManager",
@@ -550,74 +651,3 @@ async def orchestrate_multi_agent_task(request: AgentQueryRequest, store_id: int
         "processing_time_ms": int(processing_time),
         "timestamp": datetime.now().isoformat()
     }
-
-
-# ==================== WebSocket for Real-time Updates ====================
-
-class ConnectionManager:
-    """Manage WebSocket connections"""
-    def __init__(self):
-        self.active_connections: Dict[int, List[WebSocket]] = {}
-    
-    async def connect(self, websocket: WebSocket, store_id: int):
-        await websocket.accept()
-        if store_id not in self.active_connections:
-            self.active_connections[store_id] = []
-        self.active_connections[store_id].append(websocket)
-    
-    def disconnect(self, websocket: WebSocket, store_id: int):
-        if store_id in self.active_connections:
-            self.active_connections[store_id].remove(websocket)
-    
-    async def broadcast(self, store_id: int, message: Dict):
-        if store_id in self.active_connections:
-            for connection in self.active_connections[store_id]:
-                try:
-                    await connection.send_json(message)
-                except:
-                    pass
-
-
-manager = ConnectionManager()
-
-
-@router.websocket("/ws/{store_id}")
-async def websocket_endpoint(websocket: WebSocket, store_id: int):
-    """WebSocket for real-time agent updates"""
-    await manager.connect(websocket, store_id)
-    
-    try:
-        agents = get_store_agents(store_id)
-        
-        while True:
-            data = await websocket.receive_text()
-            message_data = json.loads(data)
-            
-            msg_type = message_data.get("type")
-            
-            if msg_type == "query":
-                agent = agents["store_manager"]
-                result = await agent.process_natural_language(message_data.get("message", ""))
-                await websocket.send_json({"type": "response", "data": result})
-            
-            elif msg_type == "voice":
-                agent = agents["voice"]
-                result = await agent.process_voice_input(
-                    message_data.get("text", ""),
-                    message_data.get("language", "en")
-                )
-                await websocket.send_json({"type": "voice_response", "data": result})
-            
-            elif msg_type == "suggestions":
-                agent = agents["store_manager"]
-                suggestions = await agent.get_proactive_suggestions()
-                await websocket.send_json({"type": "suggestions", "data": suggestions})
-            
-            elif msg_type == "ping":
-                await websocket.send_json({"type": "pong", "timestamp": datetime.now().isoformat()})
-    
-    except WebSocketDisconnect:
-        manager.disconnect(websocket, store_id)
-    except Exception as e:
-        manager.disconnect(websocket, store_id)
-        print(f"WebSocket error: {e}")

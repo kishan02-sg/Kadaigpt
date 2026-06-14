@@ -155,8 +155,15 @@ async def get_current_user(
         raise credentials_exception
 
     # Raw SQL — avoids ORM lazy loading / MissingGreenlet in serverless
+    # LEFT JOIN stores so callers can read current_user.store_name without
+    # a separate per-route query (e.g. bulk backup, email templates).
     result = await db.execute(
-        text("SELECT id, email, full_name, role, phone, staff_id, is_active, store_id, password_hash, tokens_valid_after FROM users WHERE id = :uid"),
+        text(
+            "SELECT u.id, u.email, u.full_name, u.role, u.phone, u.staff_id, u.is_active, "
+            "u.store_id, u.password_hash, u.tokens_valid_after, s.name AS store_name "
+            "FROM users u LEFT JOIN stores s ON s.id = u.store_id "
+            "WHERE u.id = :uid"
+        ),
         {"uid": user_id}
     )
     row = result.mappings().first()
@@ -190,6 +197,7 @@ async def get_current_user(
         is_active=row["is_active"],
         store_id=row["store_id"],
         password_hash=row["password_hash"],
+        store_name=row.get("store_name"),
     )
     return user
 

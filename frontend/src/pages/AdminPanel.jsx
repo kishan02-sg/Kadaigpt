@@ -35,6 +35,7 @@ export default function AdminPanel({ addToast }) {
   const { t } = useTranslation()
     const [activeTab, setActiveTab] = useState('overview')
     const [searchQuery, setSearchQuery] = useState('')
+    const [userSearchQuery, setUserSearchQuery] = useState('')
     const [selectedItems, setSelectedItems] = useState([])
     const [showAddUserModal, setShowAddUserModal] = useState(false)
 
@@ -49,6 +50,23 @@ export default function AdminPanel({ addToast }) {
         avgRevenuePerUser: 543,
         supportTickets: 12
     }
+
+    const filteredStores = mockStores.filter(store => {
+        const q = searchQuery.trim().toLowerCase()
+        if (!q) return true
+        return store.name.toLowerCase().includes(q) ||
+            store.owner.toLowerCase().includes(q) ||
+            store.plan.toLowerCase().includes(q) ||
+            store.status.toLowerCase().includes(q)
+    })
+
+    const filteredUsers = mockUsers.filter(user => {
+        const q = userSearchQuery.trim().toLowerCase()
+        if (!q) return true
+        return user.name.toLowerCase().includes(q) ||
+            user.email.toLowerCase().includes(q) ||
+            user.role.toLowerCase().includes(q)
+    })
 
     const tabs = [
         { id: 'overview', label: 'Overview', icon: BarChart3 },
@@ -272,7 +290,13 @@ export default function AdminPanel({ addToast }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {mockStores.map(store => (
+                                {filteredStores.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={9} className="admin-table-empty">
+                                            No stores match "{searchQuery}"
+                                        </td>
+                                    </tr>
+                                ) : filteredStores.map(store => (
                                     <tr key={store.id}>
                                         <td><input type="checkbox" /></td>
                                         <td>
@@ -308,7 +332,12 @@ export default function AdminPanel({ addToast }) {
                     <div className="admin-toolbar">
                         <div className="search-box">
                             <Search size={18} />
-                            <input type="text" placeholder="Search users..." />
+                            <input
+                                type="text"
+                                placeholder="Search users..."
+                                value={userSearchQuery}
+                                onChange={(e) => setUserSearchQuery(e.target.value)}
+                            />
                         </div>
                         <div className="toolbar-actions">
                             <button className="btn btn-primary" onClick={() => setShowAddUserModal(true)}>
@@ -333,7 +362,13 @@ export default function AdminPanel({ addToast }) {
                                 </tr>
                             </thead>
                             <tbody>
-                                {mockUsers.map(user => (
+                                {filteredUsers.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={8} className="admin-table-empty">
+                                            No users match "{userSearchQuery}"
+                                        </td>
+                                    </tr>
+                                ) : filteredUsers.map(user => (
                                     <tr key={user.id}>
                                         <td><input type="checkbox" /></td>
                                         <td>
@@ -603,6 +638,11 @@ export default function AdminPanel({ addToast }) {
                 .admin-table {
                     width: 100%;
                     border-collapse: collapse;
+                }
+                .admin-table-empty {
+                    text-align: center;
+                    padding: 32px 16px !important;
+                    color: var(--text-tertiary);
                 }
                 .admin-table th, .admin-table td {
                     padding: 16px;

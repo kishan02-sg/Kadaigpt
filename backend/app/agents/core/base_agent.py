@@ -235,16 +235,19 @@ class BaseAgent(ABC):
                 
                 if tool_name:
                     result = await self.execute_tool(tool_name, parameters)
-                    
+
                     # Add to memory
                     self.memory.add_to_short_term({
                         "action": tool_name,
                         "parameters": parameters,
                         "result": str(result)[:500]  # Truncate for memory
                     })
-                
-                # Small delay to prevent infinite loops
-                await asyncio.sleep(0.1)
+
+                # think() implementations are single-shot (pick one tool and
+                # return its result) - none of them ever emit "goal_complete",
+                # so without this the loop would run forever.
+                goal.completed = True
+                goal.result = result if tool_name else decision
         
         except Exception as e:
             self.status = AgentStatus.ERROR

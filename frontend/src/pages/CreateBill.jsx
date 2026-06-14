@@ -6,6 +6,7 @@ import whatsappService from '../services/whatsapp'
 import api from '../services/api'
 import { trackBillCreated } from '../components/CelebrationEngine'
 import { demoProducts } from '../services/demoData'
+import BarcodeScanner from '../components/BarcodeScanner'
 
 const categories = ["All", "Grains", "Pulses", "Essentials", "Oils", "Beverages", "Dairy", "General", "Snacks", "Packaged", "Household", "Personal Care"]
 
@@ -39,7 +40,33 @@ export default function CreateBill({ addToast, setCurrentPage }) {
   useEffect(() => {
     loadProducts()
     loadCustomers()
+    loadOcrDraft()
   }, [])
+
+  const loadOcrDraft = () => {
+    const draft = sessionStorage.getItem('kadai_ocr_draft')
+    if (!draft) return
+    sessionStorage.removeItem('kadai_ocr_draft')
+    try {
+      const ocrItems = JSON.parse(draft)
+      if (!Array.isArray(ocrItems) || ocrItems.length === 0) return
+      setCart(prev => [
+        ...prev,
+        ...ocrItems.map((item, idx) => ({
+          id: `ocr-${Date.now()}-${idx}`,
+          name: item.name,
+          price: parseFloat(item.price) || 0,
+          quantity: parseFloat(item.quantity) || 1,
+          unit: item.unit || 'pcs',
+          category: 'General',
+          stock: 9999
+        }))
+      ])
+      addToast?.(`${ocrItems.length} item${ocrItems.length > 1 ? 's' : ''} added from scanned bill`, 'success')
+    } catch (e) {
+      console.error('Failed to load OCR draft:', e)
+    }
+  }
 
   const loadCustomers = async () => {
     try {
@@ -1056,59 +1083,16 @@ export default function CreateBill({ addToast, setCurrentPage }) {
       {/* Barcode Scanner Input Modal */}
       {showBarcodeInput && (
         <div className="modal-overlay" onClick={() => setShowBarcodeInput(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
-            <div className="modal-header">
-              <h3 className="modal-title">📷 Scan / Enter Barcode</h3>
-              <button className="modal-close" onClick={() => setShowBarcodeInput(false)}><X size={20} /></button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
-                Scan with a barcode reader or type the barcode/SKU number manually.
-              </p>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Scan or type barcode here..."
-                autoFocus
-                style={{ fontSize: '1.2rem', fontWeight: 600, textAlign: 'center', letterSpacing: 2 }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const code = e.target.value.trim()
-                    if (!code) return
-                    // Search by barcode or SKU
-                    const found = products.find(p =>
-                      p.barcode === code || p.sku === code ||
-                      p.barcode?.toLowerCase() === code.toLowerCase() ||
-                      p.sku?.toLowerCase() === code.toLowerCase()
-                    )
-                    if (found) {
-                      addToCart(found)
-                      addToast(`✅ ${found.name} added via barcode`, 'success')
-                      e.target.value = ''
-                      // Don't close — allow scanning multiple items
-                    } else {
-                      // Try partial name match as fallback
-                      const nameMatch = products.find(p => p.name.toLowerCase().includes(code.toLowerCase()))
-                      if (nameMatch) {
-                        addToCart(nameMatch)
-                        addToast(`✅ ${nameMatch.name} added (matched by name)`, 'success')
-                        e.target.value = ''
-                      } else {
-                        addToast(`❌ No product found for barcode: ${code}`, 'error')
-                      }
-                    }
-                  }
-                }}
-              />
-              <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', display: 'block', width: '100%' }}>
-                  💡 Tip: Press Enter after scanning. Scanner stays open for multiple items.
-                </span>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowBarcodeInput(false)}>Done</button>
-            </div>
+          <div onClick={e => e.stopPropagation()} style={{ maxWidth: 420, width: '100%' }}>
+            <BarcodeScanner
+              products={products}
+              onProductFound={(product) => {
+                addToCart(product)
+                addToast(`✅ ${product.name} added via barcode`, 'success')
+                // Don't close — allow scanning multiple items
+              }}
+              onClose={() => setShowBarcodeInput(false)}
+            />
           </div>
         </div>
       )}

@@ -33,6 +33,7 @@ class TestCompleteUserFlow:
         register_response = client.post("/api/v1/auth/register", json={
             "email": email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "New Kirana Store"
         })
         
@@ -47,19 +48,18 @@ class TestCompleteUserFlow:
         # Step 3: Add first product
         product_response = client.post("/api/v1/products", headers=headers, json={
             "name": "Rice 5kg",
-            "price": 450,
-            "stock": 50,
-            "category": "Grains"
+            "selling_price": 450,
+            "current_stock": 50
         })
-        assert product_response.status_code == 200
-        
+        assert product_response.status_code == 201
+
         # Step 4: Create first bill
         bill_response = client.post("/api/v1/bills", headers=headers, json={
             "customer_name": "First Customer",
             "items": [{"product_name": "Rice 5kg", "quantity": 1, "unit_price": 450}],
             "payment_mode": "Cash"
         })
-        assert bill_response.status_code == 200
+        assert bill_response.status_code == 201
         
         # Step 5: Check dashboard again (should show activity)
         final_dashboard = client.get("/api/v1/dashboard/stats", headers=headers)
@@ -78,6 +78,7 @@ class TestBillingFlow:
         response = client.post("/api/v1/auth/register", json={
             "email": email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "Billing Test Store"
         })
         
@@ -108,15 +109,15 @@ class TestBillingFlow:
             ],
             "payment_mode": "Cash"
         })
-        
-        assert response.status_code == 200
+
+        assert response.status_code == 201
         bill = response.json()
         assert bill.get("total") == (450 * 2 + 150) or "id" in bill
-    
+
     def test_create_upi_bill(self, client, setup_store):
         """Test creating a UPI payment bill"""
         headers = setup_store
-        
+
         response = client.post("/api/v1/bills", headers=headers, json={
             "customer_name": "UPI Customer",
             "customer_phone": "9876543210",
@@ -125,13 +126,13 @@ class TestBillingFlow:
             ],
             "payment_mode": "UPI"
         })
-        
-        assert response.status_code == 200
-    
+
+        assert response.status_code == 201
+
     def test_create_credit_bill(self, client, setup_store):
         """Test creating a credit/khata bill"""
         headers = setup_store
-        
+
         response = client.post("/api/v1/bills", headers=headers, json={
             "customer_name": "Credit Customer",
             "customer_phone": "9876543211",
@@ -140,8 +141,8 @@ class TestBillingFlow:
             ],
             "payment_mode": "Credit"
         })
-        
-        assert response.status_code == 200
+
+        assert response.status_code == 201
 
 
 class TestInventoryFlow:
@@ -155,6 +156,7 @@ class TestInventoryFlow:
         response = client.post("/api/v1/auth/register", json={
             "email": email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "Inventory Test Store"
         })
         
@@ -168,13 +170,13 @@ class TestInventoryFlow:
         # Add product with stock
         add_response = client.post("/api/v1/products", headers=headers, json={
             "name": "Test Product",
-            "price": 100,
-            "stock": 10,
-            "min_stock": 5
+            "selling_price": 100,
+            "current_stock": 10,
+            "min_stock_alert": 5
         })
-        
-        assert add_response.status_code == 200
-        initial_stock = add_response.json().get("stock", 10)
+
+        assert add_response.status_code == 201
+        initial_stock = add_response.json().get("current_stock", 10)
         
         # Sell some
         client.post("/api/v1/bills", headers=headers, json={
@@ -198,6 +200,7 @@ class TestCustomerFlow:
         response = client.post("/api/v1/auth/register", json={
             "email": email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "Customer Test Store"
         })
         
@@ -224,8 +227,8 @@ class TestCustomerFlow:
             "items": [{"product_name": "Product", "quantity": 1, "unit_price": 500}],
             "payment_mode": "Credit"
         })
-        
-        assert bill_response.status_code == 200
+
+        assert bill_response.status_code == 201
         
         # Check customer stats
         stats_response = client.get("/api/v1/customers/stats/summary", headers=headers)
@@ -243,6 +246,7 @@ class TestAnalyticsFlow:
         response = client.post("/api/v1/auth/register", json={
             "email": email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "Analytics Test Store"
         })
         
@@ -291,6 +295,7 @@ class TestBulkOperationsFlow:
         response = client.post("/api/v1/auth/register", json={
             "email": email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "Bulk Test Store"
         })
         

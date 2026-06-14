@@ -3,7 +3,7 @@ KadaiGPT - OCR Router
 Handwritten bill processing with AI-powered extraction
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Optional
@@ -16,7 +16,7 @@ from app.database import get_db
 from app.models import HandwrittenBill, Product, User, OCRConfidence
 from app.schemas import OCRResult, HandwrittenBillResponse
 from app.routers.auth import get_current_active_user
-from app.agents import ocr_agent
+from app.agents.ocr_agent import ocr_agent
 from app.config import settings
 
 
@@ -248,7 +248,7 @@ async def get_ocr_result(
     )
     ocr_record = result.scalar_one_or_none()
     
-    if not ocr_re:
+    if not ocr_record:
         raise HTTPException(status_code=404, detail="OCR record not found")
     
     return {
@@ -313,6 +313,7 @@ async def verify_ocr_result(
 @router.post("/{ocr_id}/convert-to-bill")
 async def convert_to_digital_bill(
     ocr_id: int,
+    background_tasks: BackgroundTasks,
     customer_name: Optional[str] = None,
     customer_phone: Optional[str] = None,
     current_user: User = Depends(get_current_active_user),
@@ -364,6 +365,7 @@ async def convert_to_digital_bill(
     # Create the bill
     bill = await create_bill(
         bill_data=bill_data,
+        background_tasks=background_tasks,
         auto_print=False,
         current_user=current_user,
         db=db

@@ -28,6 +28,7 @@ def auth_headers(client):
     response = client.post("/api/v1/auth/register", json={
         "email": email,
         "password": "SecurePass123!",
+        "full_name": "Test Owner",
         "store_name": "Bills Test Store"
     })
     
@@ -94,10 +95,10 @@ class TestCreateBill:
             headers=auth_headers,
             json=bill_data
         )
-        
-        assert response.status_code == 200
+
+        assert response.status_code == 201
         data = response.json()
-        
+
         assert "bill_number" in data or "id" in data
     
     def test_create_bill_unauthorized(self, client):
@@ -144,9 +145,9 @@ class TestCreateBill:
             headers=auth_headers,
             json=bill_data
         )
-        
-        assert response.status_code == 200
-    
+
+        assert response.status_code == 201
+
     def test_create_bill_credit_payment(self, client, auth_headers):
         """Test creating bill with credit payment"""
         bill_data = {
@@ -167,8 +168,8 @@ class TestCreateBill:
             headers=auth_headers,
             json=bill_data
         )
-        
-        assert response.status_code == 200
+
+        assert response.status_code == 201
 
 
 class TestGetBill:
@@ -220,8 +221,8 @@ class TestBillStatistics:
         
         assert response.status_code == 200
         data = response.json()
-        
-        assert "today_sales" in data or "total_sales" in data
+
+        assert "todaySales" in data
 
 
 class TestPrintBill:

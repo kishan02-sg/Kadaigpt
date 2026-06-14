@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
+import api from '../services/api'
 import {
     Brain, Bot, Cpu, Zap, TrendingUp, Package, Users,
     Mic, MicOff, Send, X, ChevronRight, Settings,
@@ -222,16 +223,10 @@ export default function UnifiedAIAssistant({ addToast, setCurrentPage, products 
 
     const fetchInsights = async () => {
         try {
-            const res = await fetch('/api/v1/agents/suggestions')
-            if (res.ok) {
-                const data = await res.json()
-                setInsights(data.suggestions || [])
-            }
+            const data = await api.getAgentSuggestions()
+            setInsights(data.suggestions || [])
         } catch (e) {
-            setInsights([
-                { type: "inventory", priority: "high", title: language === 'en' ? "Low Stock Alert" : language === 'hi' ? "कम स्टॉक अलर्ट" : "குறைவான ஸ்டாக்", message: "3 items" },
-                { type: "trend", priority: "medium", title: language === 'en' ? "Sales Trend" : language === 'hi' ? "बिक्री ट्रेंड" : "விற்பனை போக்கு", message: "+32%" }
-            ])
+            setInsights([])
         }
     }
 
@@ -250,27 +245,19 @@ export default function UnifiedAIAssistant({ addToast, setCurrentPage, products 
         setIsProcessing(true)
 
         try {
-            const res = await fetch('/api/v1/agents/query', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: messageText, agent_type: activeAgent, context: { language } })
-            })
-
-            let responseData
-            if (res.ok) {
-                responseData = await res.json()
-            } else {
-                responseData = generateSmartResponse(messageText, activeAgent, language)
-            }
-
+            const responseData = await api.queryAgent(messageText, activeAgent, { language })
             addAgentMessage(responseData)
 
             if (voiceEnabled && activeAgent === 'voice' && responseData.response?.spoken_response) {
                 speak(responseData.response.spoken_response, language)
             }
-
         } catch (e) {
-            addAgentMessage(generateSmartResponse(messageText, activeAgent, language))
+            const errorText = language === 'hi'
+                ? "क्षमा करें, AI सहायक से अभी जुड़ नहीं पाया। कृपया फिर से कोशिश करें।"
+                : language === 'ta'
+                    ? "மன்னிக்கவும், AI உதவியாளரை அணுக முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
+                    : "Sorry, I couldn't reach the AI assistant. Please try again."
+            addAgentMessage({ response: { message: errorText } })
         } finally {
             setIsProcessing(false)
         }
@@ -284,6 +271,8 @@ export default function UnifiedAIAssistant({ addToast, setCurrentPage, products 
             agent: activeAgent,
             text,
             data,
+            isDemo: !!data?.response?.is_demo,
+            demoNote: data?.response?.demo_note,
             timestamp: new Date()
         }])
     }
@@ -291,52 +280,43 @@ export default function UnifiedAIAssistant({ addToast, setCurrentPage, products 
     const formatResponse = (data) => {
         if (!data) return "Processed."
         if (typeof data === 'string') return data
-        if (data.response?.spoken_response) return data.response.spoken_response
-        if (data.response?.message) return data.response.message
-        if (data.response?.response) return data.response.response
-        if (data.response?.insights) {
-            return data.response.insights.map(i => `• **${i.title}**: ${i.description}`).join('\n\n')
-        }
-        return JSON.stringify(data.response || data, null, 2).substring(0, 400)
-    }
 
-    const generateSmartResponse = (query, agent, lang) => {
-        const q = query.toLowerCase()
+        const r = data.response
+        if (!r) return JSON.stringify(data, null, 2).substring(0, 400)
+        if (typeof r === 'string') return r
 
-        const responses = {
-            en: {
-                sales: "📊 **Today's Performance**\n\n💰 Total Sales: ₹24,580\n🧾 Bills Created: 47\n👥 Customers: 38\n📈 Average Bill: ₹523\n\n*12% higher than yesterday*",
-                stock: "📦 **Inventory Status**\n\n⚠️ 3 items low stock\n✅ 120 products healthy\n🔮 ML predictions ready\n\n**Urgent:**\n• Toor Dal: 8kg (Min: 15)\n• Milk: 15L (Min: 50)",
-                forecast: "🔮 **7-Day Sales Forecast**\n\n📅 Mon: ₹21,500\n📅 Tue: ₹22,100\n📅 Wed: ₹23,400\n📅 Thu: ₹22,800\n📅 Fri: ₹25,200\n📅 Sat: ₹32,400 ⬆️\n📅 Sun: ₹28,000\n\n**Total Expected: ₹1,75,400**",
-                default: "I'm your AI assistant. Ask me about sales, inventory, customers, or say 'help' for options!"
-            },
-            hi: {
-                sales: "📊 **आज का प्रदर्शन**\n\n💰 कुल बिक्री: ₹24,580\n🧾 बिल बनाए: 47\n👥 ग्राहक: 38\n📈 औसत बिल: ₹523\n\n*कल से 12% अधिक*",
-                stock: "📦 **इन्वेंटरी स्थिति**\n\n⚠️ 3 आइटम कम स्टॉक\n✅ 120 प्रोडक्ट ठीक\n🔮 ML भविष्यवाणी तैयार\n\n**तुरंत:**\n• तूर दाल: 8kg (न्यूनतम: 15)\n• दूध: 15L (न्यूनतम: 50)",
-                forecast: "🔮 **7 दिन का पूर्वानुमान**\n\n📅 सोम: ₹21,500\n📅 मंगल: ₹22,100\n📅 बुध: ₹23,400\n📅 गुरु: ₹22,800\n📅 शुक्र: ₹25,200\n📅 शनि: ₹32,400 ⬆️\n📅 रवि: ₹28,000\n\n**कुल अपेक्षित: ₹1,75,400**",
-                default: "मैं आपका AI सहायक हूं। बिक्री, इन्वेंटरी, ग्राहकों के बारे में पूछें!"
-            },
-            ta: {
-                sales: "📊 **இன்றைய செயல்திறன்**\n\n💰 மொத்த விற்பனை: ₹24,580\n🧾 பில்கள்: 47\n👥 வாடிக்கையாளர்கள்: 38\n📈 சராசரி பில்: ₹523\n\n*நேற்றை விட 12% அதிகம்*",
-                stock: "📦 **சரக்கு நிலை**\n\n⚠️ 3 பொருட்கள் குறைவான ஸ்டாக்\n✅ 120 பொருட்கள் நல்ல நிலையில்\n🔮 ML கணிப்புகள் தயார்",
-                forecast: "🔮 **7 நாள் முன்னறிவிப்பு**\n\n📅 திங்கள்: ₹21,500\n📅 செவ்வாய்: ₹22,100\n📅 புதன்: ₹23,400\n📅 வியாழன்: ₹22,800\n📅 வெள்ளி: ₹25,200\n📅 சனி: ₹32,400 ⬆️\n\n**எதிர்பார்க்கப்படும் மொத்தம்: ₹1,75,400**",
-                default: "நான் உங்கள் AI உதவியாளர். விற்பனை, சரக்கு பற்றி கேளுங்கள்!"
-            }
+        if (r.spoken_response) return r.spoken_response
+        if (r.message) return r.message
+        if (r.response) return r.response
+
+        const lines = []
+
+        if (r.recommendation) lines.push(r.recommendation)
+
+        if (Array.isArray(r.items) && r.items.length) {
+            lines.push(...r.items.slice(0, 5).map(i =>
+                `• ${i.name}: ${i.stock ?? i.quantity ?? ''} ${i.unit || ''}`.trim()
+            ))
         }
 
-        const r = responses[lang] || responses.en
-
-        if (q.includes('sale') || q.includes('बिक्री') || q.includes('விற்பனை') || q.includes('today')) {
-            return { response: { message: r.sales } }
-        }
-        if (q.includes('stock') || q.includes('inventory') || q.includes('स्टॉक') || q.includes('ஸ்டாக்') || q.includes('low')) {
-            return { response: { message: r.stock } }
-        }
-        if (q.includes('forecast') || q.includes('predict') || q.includes('पूर्वानुमान') || q.includes('முன்னறிவிப்பு')) {
-            return { response: { message: r.forecast } }
+        if (Array.isArray(r.insights) && r.insights.length) {
+            lines.push(...r.insights.map(i => `• **${i.title}**: ${i.text || i.description || ''}`))
         }
 
-        return { response: { message: r.default } }
+        if (Array.isArray(r.analysis?.recommendations) && r.analysis.recommendations.length) {
+            lines.push(...r.analysis.recommendations.map(rec => `• ${rec}`))
+        }
+
+        if (typeof r.sales === 'number') {
+            lines.push(`💰 Sales (${r.period || 'period'}): ₹${r.sales.toLocaleString('en-IN')}`)
+            if (r.bills != null) lines.push(`🧾 Bills: ${r.bills}`)
+            if (r.customers != null) lines.push(`👥 Customers: ${r.customers}`)
+            if (r.avg_bill_value != null) lines.push(`📈 Avg Bill: ₹${r.avg_bill_value}`)
+        }
+
+        if (lines.length) return lines.join('\n')
+
+        return JSON.stringify(r, null, 2).substring(0, 400)
     }
 
     const speak = (text, lang) => {
@@ -529,6 +509,12 @@ export default function UnifiedAIAssistant({ addToast, setCurrentPage, products 
                                                 .replace(/\n/g, '<br>')
                                         }}
                                     />
+                                    {msg.isDemo && (
+                                        <div className="msg-demo-note">
+                                            <AlertCircle size={10} />
+                                            {msg.demoNote || 'Demo data'}
+                                        </div>
+                                    )}
                                     <span className="msg-time">
                                         {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </span>
@@ -921,6 +907,13 @@ export default function UnifiedAIAssistant({ addToast, setCurrentPage, products 
                     color: var(--text-secondary);
                 }
                 .msg-time { font-size: 0.6rem; color: var(--text-tertiary); margin-top: 4px; display: block; }
+                .msg-demo-note {
+                    display: flex; align-items: center; gap: 4px;
+                    margin-top: 6px;
+                    font-size: 0.65rem;
+                    color: var(--text-tertiary);
+                    font-style: italic;
+                }
 
                 /* Quick Commands */
                 .uai-quick {

@@ -428,7 +428,15 @@
     "addToBill": "बिल में जोड़ें",
     "rescan": "फिर से स्कैन करें",
     "setupRequired": "OCR के लिए Google Gemini API कुंजी आवश्यक है। अपने Vercel एनवायरनमेंट वेरिएबल्स में GOOGLE_API_KEY जोड़ें।",
-    "noResults": "इस इमेज से आइटम निकालने में असमर्थ। स्पष्ट फोटो आज़माएं।"
+    "noResults": "इस इमेज से आइटम निकालने में असमर्थ। स्पष्ट फोटो आज़माएं।",
+    "confidence": "विश्वसनीयता",
+    "needsReview": "जांच आवश्यक",
+    "itemsFound": "{{count}} आइटम मिले",
+    "readyToScan": "फोटो तैयार है। आइटम निकालने के लिए \"बिल स्कैन करें\" दबाएं।",
+    "chooseDifferent": "दूसरी फोटो चुनें",
+    "addedToCart": "{{count}} आइटम बिल में जोड़े गए",
+    "removeItem": "आइटम हटाएं",
+    "reviewBeforeAdding": "बिल में जोड़ने से पहले आइटम जांचें और संपादित करें"
   },
   "storeManager": {
     "title": "मेरी दुकानें",

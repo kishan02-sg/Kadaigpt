@@ -30,6 +30,7 @@ class TestRegistration:
         response = client.post("/api/v1/auth/register", json={
             "email": unique_email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "Test Kirana Store"
         })
         
@@ -46,6 +47,7 @@ class TestRegistration:
         response = client.post("/api/v1/auth/register", json={
             "email": "invalid-email",
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "Test Store"
         })
         
@@ -56,6 +58,7 @@ class TestRegistration:
         response = client.post("/api/v1/auth/register", json={
             "email": f"test_{datetime.now().timestamp()}@example.com",
             "password": "123",  # Too short
+            "full_name": "Test Owner",
             "store_name": "Test Store"
         })
         
@@ -70,13 +73,15 @@ class TestRegistration:
         client.post("/api/v1/auth/register", json={
             "email": email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "Store 1"
         })
-        
+
         # Second registration with same email
         response = client.post("/api/v1/auth/register", json={
             "email": email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "Store 2"
         })
         
@@ -104,6 +109,7 @@ class TestLogin:
         client.post("/api/v1/auth/register", json={
             "email": email,
             "password": password,
+            "full_name": "Test Owner",
             "store_name": "Login Test Store"
         })
         
@@ -160,6 +166,7 @@ class TestCurrentUser:
         register_response = client.post("/api/v1/auth/register", json={
             "email": email,
             "password": "SecurePass123!",
+            "full_name": "Test Owner",
             "store_name": "My Store"
         })
         

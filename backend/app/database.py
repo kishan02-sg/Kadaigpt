@@ -175,6 +175,7 @@ _ADDITIVE_COLUMNS = [
     ("customers", "loyalty_points", "INTEGER DEFAULT 0"),
     ("customers", "last_purchase", "TIMESTAMP"),
     ("users", "tokens_valid_after", "TIMESTAMP"),
+    ("subscription_invoices", "gateway_order_id", "VARCHAR(200)"),
 ]
 
 
@@ -218,6 +219,11 @@ async def run_migrations():
         # Add tokens_valid_after to users (JWT revocation support)
         """DO $$ BEGIN
             ALTER TABLE users ADD COLUMN tokens_valid_after TIMESTAMPTZ;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;""",
+        # Add gateway_order_id to subscription_invoices (Razorpay order tracking)
+        """DO $$ BEGIN
+            ALTER TABLE subscription_invoices ADD COLUMN gateway_order_id VARCHAR(200);
         EXCEPTION WHEN duplicate_column THEN NULL;
         END $$;""",
     ]
@@ -342,6 +348,102 @@ _SERVERLESS_SCHEMA_STATEMENTS = [
     "ALTER TABLE stores ADD COLUMN IF NOT EXISTS wa_connected BOOLEAN DEFAULT false",
     "CREATE INDEX IF NOT EXISTS idx_stores_wa_phone ON stores(wa_cloud_phone_id)",
     "CREATE INDEX IF NOT EXISTS idx_stores_wa_session ON stores(wa_session)",
+    # Subscription system (Razorpay checkout). The `subscriptions` table may already
+    # exist from an earlier schema (plan_name/plan_type) — add the columns the
+    # current ORM model (app/models/subscription.py) expects.
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'free'",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_cycle VARCHAR(20) DEFAULT 'monthly'",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS price_amount DOUBLE PRECISION DEFAULT 0",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'INR'",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS trial_start TIMESTAMPTZ",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS trial_end TIMESTAMPTZ",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS gateway VARCHAR(50)",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS custom_price DOUBLE PRECISION",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS custom_features JSONB",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS activated_by VARCHAR(100)",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS activation_source VARCHAR(100)",
+    "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS partner_code VARCHAR(50)",
+    """CREATE TABLE IF NOT EXISTS usage_records (
+        id SERIAL PRIMARY KEY,
+        subscription_id INTEGER NOT NULL REFERENCES subscriptions(id),
+        store_id INTEGER NOT NULL REFERENCES stores(id),
+        period_start TIMESTAMPTZ NOT NULL,
+        period_end TIMESTAMPTZ NOT NULL,
+        bills_created INTEGER DEFAULT 0,
+        whatsapp_messages_sent INTEGER DEFAULT 0,
+        ocr_scans INTEGER DEFAULT 0,
+        api_calls INTEGER DEFAULT 0,
+        storage_mb DOUBLE PRECISION DEFAULT 0,
+        ai_queries INTEGER DEFAULT 0,
+        voice_commands INTEGER DEFAULT 0,
+        demand_forecasts INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_usage_records_store ON usage_records(store_id, period_start, period_end)",
+    """CREATE TABLE IF NOT EXISTS subscription_invoices (
+        id SERIAL PRIMARY KEY,
+        subscription_id INTEGER NOT NULL REFERENCES subscriptions(id),
+        store_id INTEGER NOT NULL REFERENCES stores(id),
+        invoice_number VARCHAR(50) UNIQUE NOT NULL,
+        invoice_date TIMESTAMPTZ DEFAULT now(),
+        due_date TIMESTAMPTZ,
+        subtotal DOUBLE PRECISION DEFAULT 0,
+        tax_amount DOUBLE PRECISION DEFAULT 0,
+        discount_amount DOUBLE PRECISION DEFAULT 0,
+        total_amount DOUBLE PRECISION NOT NULL,
+        status VARCHAR(20) DEFAULT 'draft',
+        payment_method VARCHAR(50),
+        payment_gateway VARCHAR(50),
+        payment_id VARCHAR(200),
+        gateway_order_id VARCHAR(200),
+        paid_at TIMESTAMPTZ,
+        period_start TIMESTAMPTZ,
+        period_end TIMESTAMPTZ,
+        gstin VARCHAR(20),
+        place_of_supply VARCHAR(50),
+        cgst_amount DOUBLE PRECISION DEFAULT 0,
+        sgst_amount DOUBLE PRECISION DEFAULT 0,
+        igst_amount DOUBLE PRECISION DEFAULT 0,
+        invoice_pdf_url VARCHAR(500),
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ
+    )""",
+    "ALTER TABLE subscription_invoices ADD COLUMN IF NOT EXISTS gateway_order_id VARCHAR(200)",
+    "CREATE INDEX IF NOT EXISTS idx_subscription_invoices_store ON subscription_invoices(store_id)",
+    """CREATE TABLE IF NOT EXISTS feature_flags (
+        id SERIAL PRIMARY KEY,
+        store_id INTEGER REFERENCES stores(id),
+        feature_key VARCHAR(100) NOT NULL,
+        enabled BOOLEAN DEFAULT false,
+        reason TEXT,
+        enabled_by VARCHAR(100),
+        rollout_percentage DOUBLE PRECISION DEFAULT 100.0,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        expires_at TIMESTAMPTZ
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_feature_flags_key ON feature_flags(feature_key)",
+    """CREATE TABLE IF NOT EXISTS partner_referrals (
+        id SERIAL PRIMARY KEY,
+        partner_name VARCHAR(200) NOT NULL,
+        partner_type VARCHAR(50),
+        partner_code VARCHAR(50) UNIQUE NOT NULL,
+        partner_phone VARCHAR(20),
+        partner_email VARCHAR(200),
+        city VARCHAR(100),
+        state VARCHAR(100),
+        district VARCHAR(100),
+        per_signup_commission DOUBLE PRECISION DEFAULT 500.0,
+        recurring_commission DOUBLE PRECISION DEFAULT 50.0,
+        commission_currency VARCHAR(10) DEFAULT 'INR',
+        total_signups INTEGER DEFAULT 0,
+        active_stores INTEGER DEFAULT 0,
+        total_earned DOUBLE PRECISION DEFAULT 0.0,
+        last_signup_date TIMESTAMPTZ,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ
+    )""",
 ]
 
 

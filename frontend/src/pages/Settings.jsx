@@ -572,7 +572,7 @@ export default function Settings({ addToast }) {
                                 <li>✅ AI Price Predictions</li>
                                 <li>✅ Multi-language Support</li>
                             </ul>
-                            <button className="btn btn-primary" onClick={() => addToast('Upgrade coming soon!', 'info')}>Upgrade Now</button>
+                            <button className="btn btn-primary" onClick={() => { window.location.hash = 'subscription' }}>Upgrade Now</button>
                         </div>
 
                         <div className="plan-card enterprise">

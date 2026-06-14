@@ -28,6 +28,7 @@ def auth_headers(client):
     response = client.post("/api/v1/auth/register", json={
         "email": email,
         "password": "SecurePass123!",
+        "full_name": "Test Owner",
         "store_name": "Products Test Store"
     })
     
@@ -80,23 +81,22 @@ class TestCreateProduct:
         product_data = {
             "name": f"Test Product {datetime.now().timestamp()}",
             "sku": f"TEST-{int(datetime.now().timestamp())}",
-            "price": 100,
-            "stock": 50,
-            "category": "Test",
+            "selling_price": 100,
+            "current_stock": 50,
             "unit": "kg"
         }
-        
+
         response = client.post(
             "/api/v1/products",
             headers=auth_headers,
             json=product_data
         )
-        
-        assert response.status_code == 200
+
+        assert response.status_code == 201
         data = response.json()
-        
+
         assert data["name"] == product_data["name"]
-        assert data["price"] == product_data["price"]
+        assert data["selling_price"] == product_data["selling_price"]
     
     def test_create_product_unauthorized(self, client):
         """Test creating product without auth"""

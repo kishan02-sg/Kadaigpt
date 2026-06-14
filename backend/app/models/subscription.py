@@ -298,6 +298,7 @@ class SubscriptionInvoice(Base):
     payment_method = Column(String(50))  # upi, card, netbanking
     payment_gateway = Column(String(50))  # razorpay
     payment_id = Column(String(200))  # Gateway payment ID
+    gateway_order_id = Column(String(200))  # Razorpay order ID (created before payment)
     paid_at = Column(DateTime(timezone=True))
     
     # Period covered

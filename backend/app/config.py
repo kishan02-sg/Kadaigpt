@@ -86,6 +86,11 @@ class Settings(BaseSettings):
     
     # Encryption
     ENCRYPTION_KEY: Optional[str] = None
+
+    # Razorpay (subscription payments). Key ID is safe to expose to the
+    # frontend for Checkout.js; Key Secret stays server-side only.
+    RAZORPAY_KEY_ID: Optional[str] = None
+    RAZORPAY_KEY_SECRET: Optional[str] = None
     
     # Allowed Hosts (production)
     allowed_hosts: str = "localhost,127.0.0.1,kadaigpt.onrender.com,kadaigpt.vercel.app"

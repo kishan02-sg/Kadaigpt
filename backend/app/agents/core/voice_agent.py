@@ -187,7 +187,7 @@ class VoiceAIAgent(BaseAgent):
             # Use Gemini for complex understanding
             return {
                 "action": "handle_conversation",
-                "parameters": {"user_input": text, "context": input_data.get('context', {})},
+                "parameters": {"user_input": text, "context": self.memory.context},
                 "reasoning": "Using AI for complex query understanding"
             }
 

@@ -217,11 +217,12 @@ class SecurityASGIMiddleware:
                     # current React build (inline styles/Vite). Tighten with nonces later.
                     (b"content-security-policy",
                      b"default-src 'self'; "
-                     b"script-src 'self' 'unsafe-inline'; "
+                     b"script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; "
                      b"style-src 'self' 'unsafe-inline'; "
-                     b"img-src 'self' data: blob:; "
+                     b"img-src 'self' data: blob: https://*.razorpay.com; "
                      b"font-src 'self' data:; "
                      b"connect-src 'self' https:; "
+                     b"frame-src 'self' https://api.razorpay.com https://*.razorpay.com; "
                      b"frame-ancestors 'none'; "
                      b"base-uri 'self'; "
                      b"form-action 'self'"),

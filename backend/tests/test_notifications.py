@@ -28,6 +28,7 @@ def auth_headers(client):
     register_data = {
         "email": f"test_notif_{datetime.now().timestamp()}@test.com",
         "password": "testpass123",
+        "full_name": "Test Owner",
         "store_name": "Test Store"
     }
     

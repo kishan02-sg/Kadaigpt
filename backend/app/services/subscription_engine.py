@@ -55,6 +55,7 @@ class SubscriptionEngine:
             sub.trial_end = now + timedelta(days=self.TRIAL_DURATION_DAYS)
 
         db.add(sub)
+        await db.flush()
         if partner_code:
             await self._track_partner_signup(db, partner_code)
 
@@ -217,6 +218,17 @@ class SubscriptionEngine:
                 for t in SubscriptionTier
             ]
         }
+
+    async def get_or_create_subscription(self, db: AsyncSession, store_id: int) -> Subscription:
+        """Get the store's subscription, creating a baseline FREE one if none exists.
+
+        Needed before writing a SubscriptionInvoice (its subscription_id FK is
+        non-nullable) since brand-new stores have no Subscription row yet.
+        """
+        sub = await self._get_subscription(db, store_id)
+        if sub:
+            return sub
+        return await self.create_subscription(db, store_id, SubscriptionTier.FREE)
 
     # ── Helpers ──
 

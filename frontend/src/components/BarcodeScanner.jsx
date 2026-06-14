@@ -1,19 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
-import { Barcode, Camera, X, Check, Loader2, Search, AlertCircle, Volume2, Zap } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Barcode, Camera, X, Check, Loader2, Search, AlertCircle, Zap } from 'lucide-react'
 
-// Demo product database for barcode lookup
-const barcodeDatabase = {
-    '8901030865701': { name: 'Britannia Good Day', price: 35, unit: 'pcs' },
-    '8901058851837': { name: 'Parle-G Biscuits', price: 10, unit: 'pcs' },
-    '8902519002267': { name: 'Tata Salt 1kg', price: 28, unit: 'pcs' },
-    '8901491101219': { name: 'Aashirvaad Atta 5kg', price: 280, unit: 'pcs' },
-    '8901725133108': { name: 'Amul Butter 100g', price: 55, unit: 'pcs' },
-    '8901030535581': { name: 'Maggi Noodles', price: 14, unit: 'pcs' },
-    '8906002470150': { name: 'Fortune Oil 1L', price: 180, unit: 'pcs' },
-    '8901063090774': { name: 'Surf Excel 1kg', price: 245, unit: 'pcs' },
-}
-
-export default function BarcodeScanner({ onProductFound, onClose }) {
+export default function BarcodeScanner({ products = [], onProductFound, onClose }) {
     const [barcode, setBarcode] = useState('')
     const [scanning, setScanning] = useState(false)
     const [result, setResult] = useState(null)
@@ -33,6 +21,32 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
         }
     }, [mode])
 
+    // Search the store's real products by barcode or SKU
+    const lookupProduct = useCallback((code) => {
+        const trimmed = (code || '').trim()
+        if (!trimmed) return
+
+        setScanning(true)
+        setError('')
+        setResult(null)
+
+        setTimeout(() => {
+            const normalized = trimmed.toLowerCase()
+            const product = products.find(p =>
+                (p.barcode && String(p.barcode).toLowerCase() === normalized) ||
+                (p.sku && String(p.sku).toLowerCase() === normalized)
+            )
+            if (product) {
+                setResult(product)
+                playBeep('success')
+            } else {
+                setError(`No product found for barcode "${trimmed}". Add this barcode to a product in Products.`)
+                playBeep('error')
+            }
+            setScanning(false)
+        }, 200)
+    }, [products])
+
     // Handle barcode input (works with USB barcode scanners)
     const handleBarcodeInput = (e) => {
         const value = e.target.value
@@ -48,26 +62,6 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
         if (e.key === 'Enter' && barcode) {
             lookupProduct(barcode)
         }
-    }
-
-    const lookupProduct = (code) => {
-        setScanning(true)
-        setError('')
-        setResult(null)
-
-        // Simulate lookup delay
-        setTimeout(() => {
-            const product = barcodeDatabase[code]
-            if (product) {
-                setResult({ ...product, barcode: code })
-                // Play success sound
-                playBeep('success')
-            } else {
-                setError('Product not found. Add manually or try again.')
-                playBeep('error')
-            }
-            setScanning(false)
-        }, 300)
     }
 
     const playBeep = (type) => {
@@ -88,6 +82,7 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
 
     const startCamera = async () => {
         try {
+            setError('')
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'environment' }
             })
@@ -107,6 +102,48 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
             streamRef.current = null
         }
     }
+
+    // Live-decode barcodes from the camera feed where the browser supports it
+    useEffect(() => {
+        if (mode !== 'camera') return
+
+        if (!('BarcodeDetector' in window)) {
+            setError('Live camera scanning isn\'t supported on this browser. Use manual / USB entry instead.')
+            return
+        }
+
+        let active = true
+        let frameId
+
+        const detector = new window.BarcodeDetector({
+            formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code']
+        })
+
+        const scanFrame = async () => {
+            if (!active) return
+            if (videoRef.current && videoRef.current.readyState >= 2) {
+                try {
+                    const codes = await detector.detect(videoRef.current)
+                    if (codes.length > 0) {
+                        active = false
+                        const value = codes[0].rawValue
+                        setBarcode(value)
+                        lookupProduct(value)
+                        return
+                    }
+                } catch {
+                    // ignore per-frame detection errors
+                }
+            }
+            if (active) frameId = requestAnimationFrame(scanFrame)
+        }
+
+        frameId = requestAnimationFrame(scanFrame)
+        return () => {
+            active = false
+            if (frameId) cancelAnimationFrame(frameId)
+        }
+    }, [mode, lookupProduct])
 
     const addToCart = () => {
         if (result) {
@@ -153,7 +190,7 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
                             ref={inputRef}
                             type="text"
                             className="barcode-input"
-                            placeholder="Scan or enter barcode..."
+                            placeholder="Scan or enter barcode / SKU..."
                             value={barcode}
                             onChange={handleBarcodeInput}
                             onKeyDown={handleKeyDown}
@@ -173,7 +210,7 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
 
             {mode === 'camera' && (
                 <div className="camera-view">
-                    <video ref={videoRef} autoPlay playsInline />
+                    <video ref={videoRef} autoPlay playsInline muted />
                     <div className="scan-overlay">
                         <div className="scan-line"></div>
                     </div>
@@ -200,8 +237,8 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
                     <div className="result-icon"><Check size={24} /></div>
                     <div className="result-info">
                         <h4>{result.name}</h4>
-                        <p className="result-barcode">{result.barcode}</p>
-                        <p className="result-price">₹{result.price} / {result.unit}</p>
+                        <p className="result-barcode">{result.barcode || result.sku}</p>
+                        <p className="result-price">₹{result.price} / {result.unit || 'pcs'}</p>
                     </div>
                     <button className="btn btn-primary" onClick={addToCart}>
                         Add to Cart
@@ -209,21 +246,10 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
                 </div>
             )}
 
-            <div className="demo-barcodes">
-                <p>Try these demo barcodes:</p>
-                <div className="demo-list">
-                    {Object.entries(barcodeDatabase).slice(0, 4).map(([code, product]) => (
-                        <button key={code} className="demo-barcode" onClick={() => { setBarcode(code); lookupProduct(code); }}>
-                            {product.name.split(' ')[0]}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
             <style>{`
-        .barcode-scanner { 
-          background: var(--bg-card); 
-          border-radius: var(--radius-xl); 
+        .barcode-scanner {
+          background: var(--bg-card);
+          border-radius: var(--radius-xl);
           padding: 24px;
           border: 1px solid var(--border-subtle);
         }
@@ -232,10 +258,10 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
         .close-btn { background: none; border: none; color: var(--text-tertiary); cursor: pointer; padding: 4px; }
 
         .scanner-modes { display: flex; gap: 8px; margin-bottom: 20px; }
-        .mode-btn { 
-          flex: 1; padding: 12px; 
+        .mode-btn {
+          flex: 1; padding: 12px;
           background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
-          border-radius: var(--radius-lg); cursor: pointer; 
+          border-radius: var(--radius-lg); cursor: pointer;
           display: flex; align-items: center; justify-content: center; gap: 8px;
           font-size: 0.875rem; font-weight: 500; color: var(--text-secondary);
           transition: all var(--transition-fast);
@@ -251,8 +277,8 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
           transition: border-color var(--transition-fast);
         }
         .input-wrapper:focus-within { border-color: var(--primary-400); }
-        .barcode-input { 
-          flex: 1; border: none; background: none; 
+        .barcode-input {
+          flex: 1; border: none; background: none;
           font-size: 1.25rem; font-family: var(--font-mono);
           color: var(--text-primary); outline: none;
         }
@@ -279,16 +305,6 @@ export default function BarcodeScanner({ onProductFound, onClose }) {
         .result-info h4 { margin: 0 0 4px; }
         .result-barcode { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-tertiary); margin: 0; }
         .result-price { font-weight: 700; color: var(--primary-400); margin: 4px 0 0; }
-
-        .demo-barcodes { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-subtle); }
-        .demo-barcodes p { font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 8px; }
-        .demo-list { display: flex; gap: 8px; flex-wrap: wrap; }
-        .demo-barcode { 
-          padding: 6px 12px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
-          border-radius: var(--radius-md); cursor: pointer; font-size: 0.75rem;
-          transition: all var(--transition-fast);
-        }
-        .demo-barcode:hover { border-color: var(--primary-400); color: var(--primary-400); }
 
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }

@@ -924,34 +924,25 @@ class ApiService {
 
     // ==================== AI AGENTS ENDPOINTS ====================
 
-    async getAgentSuggestions(storeId = 1) {
+    async getAgentSuggestions() {
         try {
-            return await this.request(`/agents/suggestions?store_id=${storeId}`)
+            return await this.request('/agents/suggestions')
         } catch (error) {
-            // Return demo suggestions if API fails
-            return {
-                suggestions: [
-                    { type: 'low_stock', message: 'Toor Dal running low', priority: 'high' },
-                    { type: 'sales_trend', message: 'Saturday sales peak detected', priority: 'medium' },
-                    { type: 'opportunity', message: 'Dairy products trending up 15%', priority: 'low' }
-                ],
-                count: 3
-            }
+            return { suggestions: [], count: 0 }
         }
     }
 
-    async queryAgent(message, agentType = 'store_manager', context = {}, storeId = 1) {
+    async queryAgent(message, agentType = 'store_manager', context = {}) {
         try {
-            return await this.request(`/agents/query?store_id=${storeId}`, {
+            return await this.request('/agents/query', {
                 method: 'POST',
                 body: JSON.stringify({ message, agent_type: agentType, context })
             })
         } catch (error) {
-            // Fallback response
             return {
-                success: true,
+                success: false,
                 agent: agentType,
-                response: `I understand you asked: "${message}". Let me help you with that.`,
+                response: { message: error.message || "Couldn't reach the AI assistant. Please try again." },
                 actions_taken: 0
             }
         }
@@ -1009,6 +1000,40 @@ class ApiService {
                 action: null
             }
         }
+    }
+
+    // Subscription / Billing
+    async getSubscriptionDetails() {
+        return this.request('/subscription/details')
+    }
+
+    async getSubscriptionTiers() {
+        return this.request('/subscription/tiers')
+    }
+
+    async getPaymentConfig() {
+        return this.request('/subscription/payment-config')
+    }
+
+    async createSubscriptionCheckout(tier, billingCycle) {
+        return this.request('/subscription/checkout', {
+            method: 'POST',
+            body: JSON.stringify({ tier, billing_cycle: billingCycle })
+        })
+    }
+
+    async verifySubscriptionPayment(payload) {
+        return this.request('/subscription/verify-payment', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+    }
+
+    async cancelSubscription(reason) {
+        return this.request('/subscription/cancel', {
+            method: 'POST',
+            body: JSON.stringify({ reason })
+        })
     }
 }
 

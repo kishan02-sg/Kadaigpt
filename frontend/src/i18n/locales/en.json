@@ -428,7 +428,15 @@
     "addToBill": "Add to Bill",
     "rescan": "Rescan",
     "setupRequired": "OCR requires Google Gemini API key. Add GOOGLE_API_KEY to your Vercel environment variables.",
-    "noResults": "Could not extract items from this image. Try a clearer photo."
+    "noResults": "Could not extract items from this image. Try a clearer photo.",
+    "confidence": "Confidence",
+    "needsReview": "Needs Review",
+    "itemsFound": "{{count}} items found",
+    "readyToScan": "Photo ready. Tap \"Scan a Bill\" to extract items.",
+    "chooseDifferent": "Choose Different Photo",
+    "addedToCart": "{{count}} items added to bill",
+    "removeItem": "Remove item",
+    "reviewBeforeAdding": "Review and edit items before adding to your bill"
   },
   "storeManager": {
     "title": "My Stores",

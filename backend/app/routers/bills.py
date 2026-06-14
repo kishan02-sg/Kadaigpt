@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Background
 from app.services.whatsapp_bot import whatsapp_bot
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
+from sqlalchemy.orm import selectinload
 from typing import List, Optional
 from datetime import datetime, timedelta, timezone
 import uuid
@@ -128,7 +129,9 @@ async def get_bill(
 ):
     """Get a specific bill with items"""
     result = await db.execute(
-        select(Bill).where(
+        select(Bill)
+        .options(selectinload(Bill.items))
+        .where(
             and_(
                 Bill.id == bill_id,
                 Bill.store_id == current_user.store_id
@@ -136,16 +139,10 @@ async def get_bill(
         )
     )
     bill = result.scalar_one_or_none()
-    
+
     if not bill:
         raise HTTPException(status_code=404, detail="Bill not found")
-    
-    # Get items
-    items_result = await db.execute(
-        select(BillItem).where(BillItem.bill_id == bill.id)
-    )
-    bill.items = items_result.scalars().all()
-    
+
     return bill
 
 
