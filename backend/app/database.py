@@ -176,6 +176,7 @@ _ADDITIVE_COLUMNS = [
     ("customers", "last_purchase", "TIMESTAMP"),
     ("users", "tokens_valid_after", "TIMESTAMP"),
     ("subscription_invoices", "gateway_order_id", "VARCHAR(200)"),
+    ("stores", "status", "VARCHAR(20) DEFAULT 'active'"),
 ]
 
 
@@ -225,6 +226,32 @@ async def run_migrations():
         """DO $$ BEGIN
             ALTER TABLE subscription_invoices ADD COLUMN gateway_order_id VARCHAR(200);
         EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;""",
+        # Add status to stores (admin suspension state)
+        """DO $$ BEGIN
+            ALTER TABLE stores ADD COLUMN status VARCHAR(20) DEFAULT 'active';
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;""",
+        # Allow NULL store_id on users (platform ADMIN accounts)
+        """DO $$ BEGIN
+            ALTER TABLE users ALTER COLUMN store_id DROP NOT NULL;
+        EXCEPTION WHEN others THEN NULL;
+        END $$;""",
+        # If users.role is backed by a native Postgres ENUM type, it must learn
+        # the new 'ADMIN' value before any row can be set to that role.
+        # No-op if the column is a plain VARCHAR (not a Postgres enum).
+        """DO $$
+        DECLARE
+            col_type text;
+        BEGIN
+            SELECT udt_name INTO col_type
+            FROM information_schema.columns
+            WHERE table_name = 'users' AND column_name = 'role';
+
+            IF col_type IS NOT NULL AND col_type NOT IN ('varchar', 'text', 'bpchar') THEN
+                EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', col_type, 'ADMIN');
+            END IF;
+        EXCEPTION WHEN others THEN NULL;
         END $$;""",
     ]
     try:
@@ -444,6 +471,77 @@ _SERVERLESS_SCHEMA_STATEMENTS = [
         created_at TIMESTAMPTZ DEFAULT now(),
         updated_at TIMESTAMPTZ
     )""",
+    # Platform admin: store lifecycle state + nullable user.store_id (admin accounts)
+    "ALTER TABLE stores ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active'",
+    """DO $$ BEGIN
+        ALTER TABLE users ALTER COLUMN store_id DROP NOT NULL;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;""",
+    # If users.role is backed by a native Postgres ENUM type, it must learn the
+    # new 'ADMIN' value before any row can be set to that role. No-op if the
+    # column is a plain VARCHAR (not a Postgres enum).
+    """DO $$
+    DECLARE
+        col_type text;
+    BEGIN
+        SELECT udt_name INTO col_type
+        FROM information_schema.columns
+        WHERE table_name = 'users' AND column_name = 'role';
+
+        IF col_type IS NOT NULL AND col_type NOT IN ('varchar', 'text', 'bpchar') THEN
+            EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', col_type, 'ADMIN');
+        END IF;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;""",
+    # Admin-editable subscription plans (falls back to TIER_FEATURES if empty)
+    """CREATE TABLE IF NOT EXISTS plans (
+        id SERIAL PRIMARY KEY,
+        tier_key VARCHAR(20) UNIQUE NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        description TEXT,
+        price_monthly DOUBLE PRECISION DEFAULT 0,
+        price_yearly DOUBLE PRECISION DEFAULT 0,
+        currency VARCHAR(10) DEFAULT 'INR',
+        max_bills_per_month INTEGER DEFAULT -1,
+        max_languages INTEGER DEFAULT 6,
+        analytics_days INTEGER DEFAULT 30,
+        max_products INTEGER DEFAULT -1,
+        max_customers INTEGER DEFAULT -1,
+        whatsapp_messages_per_month INTEGER DEFAULT 0,
+        max_stores INTEGER DEFAULT 1,
+        features JSONB DEFAULT '[]',
+        branding BOOLEAN DEFAULT true,
+        api_access BOOLEAN DEFAULT false,
+        custom_reports BOOLEAN DEFAULT false,
+        voice_commands BOOLEAN DEFAULT true,
+        ocr_scanning BOOLEAN DEFAULT true,
+        demand_forecasting BOOLEAN DEFAULT false,
+        credit_management BOOLEAN DEFAULT false,
+        priority_support BOOLEAN DEFAULT false,
+        is_active BOOLEAN DEFAULT true,
+        sort_order INTEGER DEFAULT 0,
+        is_custom BOOLEAN DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_plans_tier_key ON plans(tier_key)",
+    # Cross-store login activity feed
+    """CREATE TABLE IF NOT EXISTS login_history (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        store_id INTEGER REFERENCES stores(id),
+        email_or_staff_id VARCHAR(255),
+        role VARCHAR(30),
+        full_name VARCHAR(200),
+        login_method VARCHAR(20),
+        success BOOLEAN DEFAULT true,
+        failure_reason VARCHAR(100),
+        ip_address VARCHAR(50),
+        user_agent VARCHAR(500),
+        created_at TIMESTAMPTZ DEFAULT now()
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_login_history_created ON login_history(created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_login_history_store_created ON login_history(store_id, created_at DESC)",
 ]
 
 

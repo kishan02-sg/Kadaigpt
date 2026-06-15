@@ -1,4 +1,4 @@
-import { ShoppingCart, LayoutDashboard, FileText, Camera, Package, Settings, LogOut, PlusCircle, User, BarChart3, Users, Receipt, MessageCircle, Truck, Gift, X, Brain, Wallet, ClipboardList, Database, Shield } from 'lucide-react'
+import { ShoppingCart, LayoutDashboard, FileText, Camera, Package, Settings, LogOut, PlusCircle, User, BarChart3, Users, Receipt, MessageCircle, Truck, Gift, X, Brain, Wallet, ClipboardList, Database } from 'lucide-react'
 import NotificationCenter from './NotificationCenter'
 
 const menuItems = [
@@ -17,7 +17,6 @@ const menuItems = [
   { id: 'gst', label: 'GST Reports', icon: Receipt },
   { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { id: 'bulk-operations', label: 'Import/Export', icon: Database },
-  { id: 'admin', label: 'Admin Panel', icon: Shield, badge: 'enterprise' },
 ]
 
 export default function Sidebar({ currentPage, setCurrentPage, isOnline, user, onLogout, isOpen = false }) {
@@ -55,13 +54,6 @@ export default function Sidebar({ currentPage, setCurrentPage, isOnline, user, o
         {/* Navigation */}
         <nav className="sidebar-nav">
           {menuItems
-            .filter(item => {
-              // Hide admin panel from non-admin users
-              if (item.id === 'admin' && localStorage.getItem('kadai_user_role') !== 'admin') {
-                return false;
-              }
-              return true;
-            })
             .map(item => (
               <button
                 key={item.id}
@@ -74,7 +66,6 @@ export default function Sidebar({ currentPage, setCurrentPage, isOnline, user, o
                 {item.id === 'loyalty' && <span className="nav-badge orange">New</span>}
                 {item.id === 'ai-insights' && <span className="nav-badge hot">🔥 AI</span>}
                 {item.id === 'daily-summary' && <span className="nav-badge blue">New</span>}
-                {item.id === 'admin' && <span className="nav-badge purple">Admin</span>}
               </button>
             ))}
         </nav>

@@ -46,6 +46,7 @@ from app.routers.audit import router as audit_router
 from app.routers.inapp_notifications import router as inapp_notifications_router
 from app.routers.backup import router as backup_router
 from app.routers.privacy import router as privacy_router
+from app.routers.admin import router as admin_router
 from app.services.keepalive import keepalive
 from app.services.scheduler import scheduler, register_default_tasks
 from app.middleware.security import rate_limiter, get_rate_limit_type, RATE_LIMITS, audit_logger
@@ -139,6 +140,10 @@ ALLOWED_ORIGINS = [
     "https://kadaigpt.vercel.app",
     "https://kadaigpt-main.vercel.app",
     "https://kadaigpt.onrender.com",
+    # Platform admin dashboard (separate app — see kadaigpt-admin)
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "https://kadaigpt-admin.vercel.app",
 ]
 
 # ═══════════════════════════════════════════════════════════════════
@@ -374,6 +379,7 @@ app.include_router(audit_router)  # Already has /api/audit prefix
 app.include_router(inapp_notifications_router)  # Already has /api/notifications prefix
 app.include_router(backup_router, prefix="/api/v1")  # /api/v1/backup
 app.include_router(privacy_router, prefix="/api/v1")  # /api/v1/privacy
+app.include_router(admin_router, prefix="/api/v1")  # /api/v1/admin/* (platform admin dashboard)
 
 
 # Serve static files from frontend build (assets like JS, CSS, images)

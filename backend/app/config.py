@@ -94,6 +94,12 @@ class Settings(BaseSettings):
     
     # Allowed Hosts (production)
     allowed_hosts: str = "localhost,127.0.0.1,kadaigpt.onrender.com,kadaigpt.vercel.app"
+
+    # Platform admin bootstrap. When set, POST /api/v1/admin/bootstrap accepts
+    # this value via the X-Bootstrap-Secret header to create the first ADMIN
+    # account on serverless deploys (no shell access). Unset -> endpoint is 404.
+    # Not subject to the production secret fail-fast check.
+    admin_bootstrap_secret: Optional[str] = None
     
     model_config = SettingsConfigDict(
         env_file=".env",

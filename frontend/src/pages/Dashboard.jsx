@@ -368,7 +368,7 @@ export default function Dashboard({ addToast, setCurrentPage }) {
           </div>
         )}
 
-        {(userRole === 'owner' || userRole === 'admin') && (
+        {userRole === 'owner' && (
           <div className="quick-access-inline owner">
             <span className="role-label">👑 Owner</span>
             <span className={`plan-badge ${userPlan}`}>{userPlan.toUpperCase()}</span>

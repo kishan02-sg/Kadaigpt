@@ -1030,23 +1030,6 @@ export default function Login({ onLogin }) {
           color: var(--text-tertiary);
         }
 
-        /* Admin Login Link */
-        .admin-login-link {
-          text-align: center;
-          margin-top: 16px;
-        }
-
-        .admin-login-link a {
-          color: var(--text-tertiary);
-          font-size: 0.8rem;
-          text-decoration: none;
-          transition: color 0.2s;
-        }
-
-        .admin-login-link a:hover {
-          color: var(--primary-400);
-        }
-        
         /* Error Alert */
         .error-alert { 
           background: rgba(239, 68, 68, 0.1); 

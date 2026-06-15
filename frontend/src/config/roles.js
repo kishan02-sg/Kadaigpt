@@ -112,8 +112,8 @@ const ROLE_CONFIG = {
 export const VALID_PAGES = [
     'dashboard', 'bills', 'create-bill', 'ocr', 'products', 'analytics',
     'customers', 'gst', 'whatsapp', 'suppliers', 'loyalty', 'ai-insights',
-    'expenses', 'daily-summary', 'bulk-operations', 'admin', 'settings',
-    'staff', 'stores', 'subscription', 'admin-login', 'privacy', 'terms',
+    'expenses', 'daily-summary', 'bulk-operations', 'settings',
+    'staff', 'stores', 'subscription', 'privacy', 'terms',
 ]
 
 /** Get the role config for a given role string */

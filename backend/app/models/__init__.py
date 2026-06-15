@@ -56,6 +56,9 @@ class Store(Base):
     wa_number = Column(String(20))
     wa_connected = Column(Boolean, default=False)
 
+    # Platform admin: store lifecycle state. active | suspended | trial | closed
+    status = Column(String(20), default="active")
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -72,8 +75,9 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
-    store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
-    
+    # Nullable for platform ADMIN accounts (store_id IS NULL = not tied to any store).
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
+
     # Auth Info
     email = Column(String(255), unique=True, index=True, nullable=False)
     phone = Column(String(20), unique=True, index=True)
@@ -418,6 +422,28 @@ class AuditTrail(Base):
     user_agent = Column(String(500))
     
     # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class LoginHistory(Base):
+    """Cross-store login activity feed (platform admin monitoring)"""
+    __tablename__ = "login_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True)
+
+    email_or_staff_id = Column(String(255))
+    role = Column(String(30))
+    full_name = Column(String(200))
+
+    login_method = Column(String(20))  # 'password' | 'staff_id' | 'admin'
+    success = Column(Boolean, default=True)
+    failure_reason = Column(String(100), nullable=True)  # 'bad_password' | 'locked' | 'inactive' | 'suspended' | 'not_found'
+
+    ip_address = Column(String(50))
+    user_agent = Column(String(500))
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 

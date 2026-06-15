@@ -18,6 +18,7 @@ class UserRole(str, enum.Enum):
     MANAGER = "MANAGER"
     CASHIER = "CASHIER"
     INVENTORY_MANAGER = "INVENTORY_MANAGER"
+    ADMIN = "ADMIN"
 
     @classmethod
     def _missing_(cls, value):

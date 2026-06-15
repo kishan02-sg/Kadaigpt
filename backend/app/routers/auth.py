@@ -5,7 +5,7 @@ User registration, login, session management, password reset & lockout
 import logging
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -20,6 +20,7 @@ from app.config import settings
 from app.models import User, Store, UserRole
 from app.utils.password import validate_password_strength
 from app.services import auth_state
+from app.services.login_history import record_login_event
 from app.services.email_service import email_service
 from app.services.msg91_service import msg91_service
 from app.services.resend_service import resend_service
@@ -122,6 +123,11 @@ def _token_revoked(token_iat, tokens_valid_after) -> bool:
     except (ValueError, TypeError, OSError):
         return True
     cutoff = tokens_valid_after
+    if isinstance(cutoff, str):
+        try:
+            cutoff = datetime.fromisoformat(cutoff.replace(" ", "T", 1))
+        except ValueError:
+            return True
     if hasattr(cutoff, "tzinfo") and cutoff.tzinfo is not None:
         cutoff = cutoff.replace(tzinfo=None)
     return issued < cutoff
@@ -160,7 +166,8 @@ async def get_current_user(
     result = await db.execute(
         text(
             "SELECT u.id, u.email, u.full_name, u.role, u.phone, u.staff_id, u.is_active, "
-            "u.store_id, u.password_hash, u.tokens_valid_after, s.name AS store_name "
+            "u.store_id, u.password_hash, u.tokens_valid_after, s.name AS store_name, "
+            "s.status AS store_status "
             "FROM users u LEFT JOIN stores s ON s.id = u.store_id "
             "WHERE u.id = :uid"
         ),
@@ -178,7 +185,11 @@ async def get_current_user(
 
     if not row["is_active"]:
         raise HTTPException(status_code=400, detail="Inactive user")
-    
+
+    # Platform admins (store_id IS NULL) bypass store-suspension entirely.
+    if row["store_status"] == "suspended" and str(row["role"]).upper() != UserRole.ADMIN.value:
+        raise HTTPException(status_code=403, detail="This store has been suspended. Contact support.")
+
     # Build a lightweight User-compatible object
     # Convert role string → UserRole enum so RBAC comparisons work
     role_str = str(row["role"]).upper()
@@ -281,6 +292,7 @@ async def register(
 
 @router.post("/login", response_model=Token)
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db)
 ):
@@ -292,6 +304,10 @@ async def login(
     # Check account lockout (persisted — survives serverless cold starts)
     remaining = await auth_state.get_lockout_seconds_remaining(db, email)
     if remaining > 0:
+        await record_login_event(
+            db, email_or_staff_id=email, success=False, method="password",
+            failure_reason="locked", request=request,
+        )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Account temporarily locked. Try again in {remaining} seconds."
@@ -304,6 +320,10 @@ async def login(
     if not user or not verify_password(form_data.password, user.password_hash):
         attempts = await auth_state.record_failed_attempt(
             db, email, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES
+        )
+        await record_login_event(
+            db, email_or_staff_id=email, success=False, method="password",
+            failure_reason="not_found" if not user else "bad_password", request=request,
         )
         if attempts >= MAX_LOGIN_ATTEMPTS:
             raise HTTPException(
@@ -318,21 +338,42 @@ async def login(
         )
 
     if not user.is_active:
+        await record_login_event(
+            db, user=user, email_or_staff_id=email, success=False, method="password",
+            failure_reason="inactive", request=request,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account is inactive"
         )
 
+    # Suspended stores cannot log in (platform ADMIN accounts have no store_id)
+    if user.role != UserRole.ADMIN:
+        store_result = await db.execute(select(Store.status).where(Store.id == user.store_id))
+        if store_result.scalar_one_or_none() == "suspended":
+            await record_login_event(
+                db, user=user, email_or_staff_id=email, success=False, method="password",
+                failure_reason="suspended", request=request,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This store has been suspended. Contact support."
+            )
+
     # Successful login — clear failed attempts
     await auth_state.clear_attempts(db, email)
-    
+
     # Update last login
     user.last_login = datetime.utcnow()
     await db.commit()
-    
+
+    await record_login_event(
+        db, user=user, email_or_staff_id=email, success=True, method="password", request=request,
+    )
+
     # Generate token - sub must be a string
     access_token = create_access_token(data={"sub": str(user.id)})
-    
+
     return Token(access_token=access_token, token_type="bearer")
 
 
@@ -507,7 +548,13 @@ async def get_current_user_profile(
 
     # Get user data via raw SQL
     user_result = await db.execute(
-        text("SELECT id, email, full_name, role, phone, staff_id, is_active, store_id, language, theme, last_login, created_at, tokens_valid_after FROM users WHERE id = :uid"),
+        text(
+            "SELECT u.id, u.email, u.full_name, u.role, u.phone, u.staff_id, u.is_active, "
+            "u.store_id, u.language, u.theme, u.last_login, u.created_at, u.tokens_valid_after, "
+            "s.status AS store_status "
+            "FROM users u LEFT JOIN stores s ON s.id = u.store_id "
+            "WHERE u.id = :uid"
+        ),
         {"uid": uid}
     )
     user_row = user_result.mappings().first()
@@ -520,6 +567,10 @@ async def get_current_user_profile(
 
     if not user_row["is_active"]:
         raise HTTPException(status_code=400, detail="Inactive user")
+
+    # Platform admins (store_id IS NULL) bypass store-suspension entirely.
+    if user_row["store_status"] == "suspended" and str(user_row["role"]).upper() != UserRole.ADMIN.value:
+        raise HTTPException(status_code=403, detail="This store has been suspended. Contact support.")
 
     # Get store data
     store_data = None
@@ -572,6 +623,7 @@ def generate_staff_id() -> str:
 
 @router.post("/staff-login", response_model=Token)
 async def staff_login(
+    http_request: Request,
     request: StaffLoginRequest,
     db: AsyncSession = Depends(get_db)
 ):
@@ -583,6 +635,10 @@ async def staff_login(
     # Check account lockout (persisted — survives serverless cold starts)
     remaining = await auth_state.get_lockout_seconds_remaining(db, staff_id)
     if remaining > 0:
+        await record_login_event(
+            db, email_or_staff_id=staff_id, success=False, method="staff_id",
+            failure_reason="locked", request=http_request,
+        )
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Account temporarily locked. Try again in {remaining} seconds."
@@ -596,6 +652,10 @@ async def staff_login(
         attempts = await auth_state.record_failed_attempt(
             db, staff_id, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES
         )
+        await record_login_event(
+            db, email_or_staff_id=staff_id, success=False, method="staff_id",
+            failure_reason="not_found" if not user else "bad_password", request=http_request,
+        )
         if attempts >= MAX_LOGIN_ATTEMPTS:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -608,9 +668,25 @@ async def staff_login(
         )
 
     if not user.is_active:
+        await record_login_event(
+            db, user=user, email_or_staff_id=staff_id, success=False, method="staff_id",
+            failure_reason="inactive", request=http_request,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account is inactive. Contact your manager."
+        )
+
+    # Suspended stores cannot log in
+    store_result = await db.execute(select(Store.status).where(Store.id == user.store_id))
+    if store_result.scalar_one_or_none() == "suspended":
+        await record_login_event(
+            db, user=user, email_or_staff_id=staff_id, success=False, method="staff_id",
+            failure_reason="suspended", request=http_request,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This store has been suspended. Contact support."
         )
 
     # Successful login — clear failed attempts
@@ -619,6 +695,10 @@ async def staff_login(
     # Update last login
     user.last_login = datetime.utcnow()
     await db.commit()
+
+    await record_login_event(
+        db, user=user, email_or_staff_id=staff_id, success=True, method="staff_id", request=http_request,
+    )
 
     # Generate token
     access_token = create_access_token(data={"sub": str(user.id)})

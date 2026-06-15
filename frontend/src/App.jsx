@@ -31,14 +31,12 @@ const AIInsights = lazy(() => import('./pages/AIInsights'))
 const ExpenseTracker = lazy(() => import('./pages/ExpenseTracker'))
 const DailySummary = lazy(() => import('./pages/DailySummary'))
 const BulkOperations = lazy(() => import('./pages/BulkOperations'))
-const AdminPanel = lazy(() => import('./pages/AdminPanel'))
 const Subscription = lazy(() => import('./pages/Subscription'))
 const StaffManagement = lazy(() => import('./pages/StaffManagement'))
 const StoreManager = lazy(() => import('./pages/StoreManager'))
 const LegalPages = lazy(() => import('./pages/LegalPages'))
 // Auth pages stay eagerly loaded (critical path)
 import Login from './pages/Login'
-import AdminLogin from './pages/AdminLogin'
 import api from './services/api'
 import { warmup } from './services/warmup'
 import { demoProducts } from './services/demoData'
@@ -294,7 +292,7 @@ function App() {
         const defaultPage = getRoleDefaultPage(role)
 
         // Redirect if page not allowed for this role
-        if (!allowedPages.includes(currentPage) && currentPage !== 'admin') {
+        if (!allowedPages.includes(currentPage)) {
             addToast('🔒 You don\'t have access to this page.', 'warning')
             setTimeout(() => setCurrentPage(defaultPage), 100)
             return null
@@ -317,7 +315,6 @@ function App() {
             case 'expenses': return <ExpenseTracker addToast={addToast} />
             case 'daily-summary': return <DailySummary addToast={addToast} />
             case 'bulk-operations': return <BulkOperations addToast={addToast} />
-            case 'admin': return <AdminPanel addToast={addToast} />
             case 'subscription': return <Subscription addToast={addToast} />
             case 'staff': return <StaffManagement addToast={addToast} />
             case 'stores': return <StoreManager addToast={addToast} setCurrentPage={setCurrentPage} />
@@ -344,11 +341,6 @@ function App() {
         return <LoadingScreen status={warmupStatus.status} message={warmupStatus.message} />
     }
 
-
-    // Admin login - separate URL
-    if (!user && currentPage === 'admin-login') {
-        return <AdminLogin onLogin={handleLogin} />
-    }
 
     if (!user) {
         return <Login onLogin={handleLogin} />
@@ -506,11 +498,6 @@ function App() {
                                 <button onClick={() => { setCurrentPage('settings'); setShowUserMenu(false); }}>
                                     <SettingsIcon size={16} /> Settings
                                 </button>
-                                {userRole === 'admin' && (
-                                    <button onClick={() => { setCurrentPage('admin'); setShowUserMenu(false); }}>
-                                        <User size={16} /> Admin Panel
-                                    </button>
-                                )}
                                 <hr />
                                 <button onClick={handleLogout} className="logout-btn">
                                     <LogOut size={16} /> Logout

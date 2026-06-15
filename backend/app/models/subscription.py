@@ -195,6 +195,45 @@ TIER_FEATURES = {
 
 # ==================== MODELS ====================
 
+class Plan(Base):
+    """Admin-editable subscription plan (DB-backed; falls back to TIER_FEATURES if empty)"""
+    __tablename__ = "plans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tier_key = Column(String(20), unique=True, nullable=False, index=True)  # 'free'|'smart'|'pro'|'enterprise'|custom
+    name = Column(String(100), nullable=False)
+    description = Column(Text)
+
+    price_monthly = Column(Float, default=0.0)
+    price_yearly = Column(Float, default=0.0)
+    currency = Column(String(10), default="INR")
+
+    max_bills_per_month = Column(Integer, default=-1)  # -1 = unlimited
+    max_languages = Column(Integer, default=6)
+    analytics_days = Column(Integer, default=30)
+    max_products = Column(Integer, default=-1)
+    max_customers = Column(Integer, default=-1)
+    whatsapp_messages_per_month = Column(Integer, default=0)
+    max_stores = Column(Integer, default=1)
+
+    features = Column(JSON, default=list)
+    branding = Column(Boolean, default=True)
+    api_access = Column(Boolean, default=False)
+    custom_reports = Column(Boolean, default=False)
+    voice_commands = Column(Boolean, default=True)
+    ocr_scanning = Column(Boolean, default=True)
+    demand_forecasting = Column(Boolean, default=False)
+    credit_management = Column(Boolean, default=False)
+    priority_support = Column(Boolean, default=False)
+
+    is_active = Column(Boolean, default=True)  # inactive = hidden from /subscription/tiers
+    sort_order = Column(Integer, default=0)
+    is_custom = Column(Boolean, default=False)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
 class Subscription(Base):
     """Store subscription tracking"""
     __tablename__ = "subscriptions"

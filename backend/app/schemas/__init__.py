@@ -56,7 +56,7 @@ class UserCreate(UserBase):
 
 class UserResponse(UserBase):
     id: int
-    store_id: int
+    store_id: Optional[int] = None
     staff_id: Optional[str] = None
     is_active: bool
     language: str
