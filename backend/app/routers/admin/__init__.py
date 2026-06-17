@@ -9,10 +9,12 @@ from fastapi import APIRouter
 from app.routers.admin.auth import router as admin_auth_router
 from app.routers.admin.stores import router as admin_stores_router
 from app.routers.admin.users import router as admin_users_router
+from app.routers.admin.subscriptions import router as admin_subscriptions_router
 
 router = APIRouter()
 router.include_router(admin_auth_router)
 router.include_router(admin_stores_router)
 router.include_router(admin_users_router)
+router.include_router(admin_subscriptions_router)
 
 __all__ = ["router"]
