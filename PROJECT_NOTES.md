@@ -63,10 +63,22 @@ off, manual UPI is labeled "Manual UPI (unverified)". **New env var:**
 `RAZORPAY_WEBHOOK_SECRET` (enable for Production AND Preview). `pytest` now
 **275/275** (17 new `test_payments.py`).
 
-**Uncommitted:** yes — nothing pushed. Deploy = `git push` to `main` after the
-judgment checks in CLAUDE.md (i18n untouched; new env var `RAZORPAY_WEBHOOK_SECRET`
-needs enabling for Production AND Preview + Razorpay dashboard webhook URL
-`https://<domain>/api/v1/payments/webhook` for `qr_code.credited`).
+**Deployed 2026-08-16** (3 commits: `e4cf3b2`, `84de629`, `bd3ebdf`) — pushed to
+`origin/main`; Vercel production deploy **Ready**, new payment endpoints live.
+Build fixes shipped along the way: the Python function bundle was 231.65 MB (over
+Vercel's 225 MB cap) — migrated AI agents from `google.generativeai`
+(grpcio/protobuf, ~113 MB) to `google-genai` (httpx-based), then bumped
+`httpx` to 0.28.1 to satisfy google-genai's resolver.
+
+**Still open before the app is truly usable in prod:**
+1. `DATABASE_URL` in Vercel is stale — host `postgres.cgekqqvbipbpduwcapnr...`
+   returns ENOTFOUND, so `/api/health` reports `database: unhealthy`. Needs the
+   current Supabase connection string (was broken before this deploy too).
+2. Enable new env var `RAZORPAY_WEBHOOK_SECRET` for Production AND Preview.
+3. Razorpay dashboard: register webhook URL
+   `https://<domain>/api/v1/payments/webhook` for the `qr_code.credited` event.
+4. `SECRET_KEY`/`JWT_SECRET_KEY`/`APP_ENV` are Production-only — Preview
+   deployments fail the secret fail-fast check; enable for Preview too.
 
 <!-- Template:
 ### YYYY-MM-DD
