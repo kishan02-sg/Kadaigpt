@@ -11,9 +11,11 @@ import os
 
 from .base_agent import BaseAgent, AgentTool, ActionType, logger
 
-# Try to import Google Generative AI
+# Google Gemini via the modern google-genai SDK (httpx-based — the legacy
+# google.generativeai package pulled in grpcio/protobuf and blew the Vercel
+# function bundle past the 225 MB limit).
 try:
-    import google.generativeai as genai
+    from google import genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -56,8 +58,8 @@ class VoiceAIAgent(BaseAgent):
         if GEMINI_AVAILABLE:
             api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
             if api_key:
-                genai.configure(api_key=api_key)
-                self.model = genai.GenerativeModel('gemini-pro')
+                self.genai_client = genai.Client(api_key=api_key)
+                self.model = "gemini-2.5-flash"
             else:
                 self.model = None
         else:
@@ -440,7 +442,7 @@ Respond naturally and concisely (max 2 sentences) to help with:
 Respond in the same language the user spoke in.
 """
             try:
-                response = self.model.generate_content(prompt)
+                response = self.genai_client.models.generate_content(model=self.model, contents=prompt)
                 assistant_response = response.text
             except Exception as e:
                 logger.error(f"Gemini error: {e}")

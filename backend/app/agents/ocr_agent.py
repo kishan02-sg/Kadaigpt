@@ -15,7 +15,7 @@ from enum import Enum
 import asyncio
 
 try:
-    import google.generativeai as genai
+    from google import genai
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -85,8 +85,8 @@ class OCRAgent:
     def _initialize_gemini(self):
         """Initialize Google Gemini for vision processing"""
         try:
-            genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            self.genai_client = genai.Client(api_key=self.api_key)
+            self.model = "gemini-2.5-flash"
             print("✅ Gemini Vision initialized successfully")
         except Exception as e:
             print(f"❌ Failed to initialize Gemini: {e}")
@@ -233,7 +233,7 @@ Important:
 """
         
         try:
-            response = self.model.generate_content([prompt, image])
+            response = self.genai_client.models.generate_content(model=self.model, contents=[prompt, image])
             response_text = response.text
             
             # Extract JSON from response

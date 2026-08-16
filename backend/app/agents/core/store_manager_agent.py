@@ -7,7 +7,17 @@ import os
 import json
 from typing import Dict, List
 from datetime import datetime, timedelta, timezone
-import google.generativeai as genai
+
+# Google Gemini via the modern google-genai SDK (httpx-based — the legacy
+# google.generativeai package pulled in grpcio/protobuf and blew the Vercel
+# function bundle past the 225 MB limit). Guarded so the agent still boots
+# with fallback logic when the SDK isn't installed.
+try:
+    from google import genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    genai = None
+    GEMINI_AVAILABLE = False
 
 from sqlalchemy import select, func, and_, or_
 
@@ -41,9 +51,9 @@ class StoreManagerAgent(BaseAgent):
 
         # Initialize Gemini
         api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        if api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('gemini-pro')
+        if api_key and GEMINI_AVAILABLE:
+            self.genai_client = genai.Client(api_key=api_key)
+            self.model = "gemini-2.5-flash"
         else:
             self.model = None
             logger.warning("No Gemini API key found. Agent will use fallback logic.")
@@ -189,7 +199,7 @@ Now decide what to do next. Respond with valid JSON only."""
         try:
             if self.model:
                 # Use Gemini for reasoning
-                response = self.model.generate_content(prompt)
+                response = self.genai_client.models.generate_content(model=self.model, contents=prompt)
                 response_text = response.text
 
                 # Parse JSON from response
