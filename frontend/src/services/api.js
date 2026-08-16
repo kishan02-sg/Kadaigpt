@@ -8,9 +8,12 @@ const API_BASE_URL = import.meta.env.PROD
 console.log('[API Config] Mode:', import.meta.env.MODE)
 console.log('[API Config] API_BASE_URL:', API_BASE_URL)
 
-// IndexedDB for offline storage
+import offlineSync from './offlineSync'
+
+// IndexedDB for offline storage (GET caching only — the write queue lives in
+// offlineSync; the old IndexedDB syncQueue silently dropped queued requests).
 const DB_NAME = 'KadaiGPT_DB'
-const DB_VERSION = 1
+const DB_VERSION = 2
 
 class OfflineStorageService {
     constructor() {
@@ -31,7 +34,9 @@ class OfflineStorageService {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result
 
-                // Create object stores
+                // Create object stores (bills/products/customers are read
+                // caches; the syncQueue store was removed in DB v2 — write
+                // replay now goes through offlineSync's localStorage queue).
                 if (!db.objectStoreNames.contains('bills')) {
                     db.createObjectStore('bills', { keyPath: 'id', autoIncrement: true })
                 }
@@ -41,11 +46,11 @@ class OfflineStorageService {
                 if (!db.objectStoreNames.contains('customers')) {
                     db.createObjectStore('customers', { keyPath: 'id', autoIncrement: true })
                 }
-                if (!db.objectStoreNames.contains('syncQueue')) {
-                    db.createObjectStore('syncQueue', { keyPath: 'id', autoIncrement: true })
-                }
                 if (!db.objectStoreNames.contains('settings')) {
                     db.createObjectStore('settings', { keyPath: 'key' })
+                }
+                if (db.objectStoreNames.contains('syncQueue')) {
+                    db.deleteObjectStore('syncQueue')
                 }
             }
         })
@@ -84,21 +89,6 @@ class OfflineStorageService {
         })
     }
 
-    async addToSyncQueue(action) {
-        await this.save('syncQueue', { ...action, timestamp: Date.now() })
-    }
-
-    async processSyncQueue() {
-        const queue = await this.getAll('syncQueue')
-        for (const item of queue) {
-            try {
-                // Process sync item
-                await this.delete('syncQueue', item.id)
-            } catch (error) {
-                console.error('Sync failed:', error)
-            }
-        }
-    }
 }
 
 const offlineStorage = new OfflineStorageService()
@@ -108,9 +98,9 @@ class ApiService {
         this.baseUrl = API_BASE_URL
         this.token = localStorage.getItem('kadai_token')
         console.log('[API] Initialized with token:', this.token ? 'token exists' : 'no token')
-
-        // Listen for online/offline events
-        window.addEventListener('online', () => this.syncOfflineData())
+        // NOTE: reconnect replay is owned by offlineSync (single sync queue).
+        // This service previously had its own 'online' listener that called
+        // processSyncQueue(), which deleted queued items without replaying them.
     }
 
     setToken(token) {
@@ -173,27 +163,32 @@ class ApiService {
                     const messages = data.detail.map(err => err.msg || err.message || JSON.stringify(err))
                     throw new Error(messages.join(', '))
                 }
+                // Object details (e.g. insufficient_stock with an items list) must
+                // survive as JSON — callers parse error.message for the breakdown.
+                // Plain-string details pass through unchanged.
+                if (data.detail && typeof data.detail === 'object') {
+                    throw new Error(JSON.stringify(data.detail))
+                }
                 throw new Error(data.detail || data.message || 'Request failed')
             }
 
             return data
         } catch (error) {
-            // If offline, queue the request
+            // Genuine network failure while offline → queue for replay via the
+            // SHARED offlineSync queue (the same queue offline bills use). It
+            // replays on reconnect with a fresh token and retry-with-backoff;
+            // nothing is silently dropped like the old IndexedDB syncQueue did.
             if (!navigator.onLine && options.method !== 'GET') {
-                await offlineStorage.addToSyncQueue({
-                    endpoint,
-                    options,
-                    type: 'api_request'
+                offlineSync.addToQueue({
+                    method: options.method || 'POST',
+                    url: `${this.baseUrl}${endpoint}`,
+                    headers: options.headers || {},
+                    body: options.body,
+                    type: 'api_request',
                 })
                 throw new Error('Offline - Request queued for sync')
             }
             throw error
-        }
-    }
-
-    async syncOfflineData() {
-        if (navigator.onLine) {
-            await offlineStorage.processSyncQueue()
         }
     }
 
@@ -530,28 +525,16 @@ class ApiService {
     }
 
     async createBill(billData) {
-        try {
-            const result = await this.request('/bills', {
-                method: 'POST',
-                body: JSON.stringify(billData),
-            })
-            await offlineStorage.save('bills', result)
-            return result
-        } catch (error) {
-            // Save locally if offline
-            if (!navigator.onLine) {
-                const offlineBill = {
-                    ...billData,
-                    id: `offline_${Date.now()}`,
-                    bill_number: `OFF-${Date.now().toString().slice(-6)}`,
-                    created_at: new Date().toISOString(),
-                    synced: false
-                }
-                await offlineStorage.save('bills', offlineBill)
-                return offlineBill
-            }
-            throw error
-        }
+        // NOTE: no offline fallback here — swallowing failures here is what
+        // silently lost bills before. Every failure (offline, dropped
+        // connection, server error) propagates to the caller, which decides
+        // whether to queue the bill offline (CreateBill.jsx -> offlineSync).
+        const result = await this.request('/bills', {
+            method: 'POST',
+            body: JSON.stringify(billData),
+        })
+        await offlineStorage.save('bills', result)
+        return result
     }
 
     async getBill(id) {
@@ -562,6 +545,24 @@ class ApiService {
         return this.request(`/bills/${billId}/cancel`, {
             method: 'POST',
             body: JSON.stringify({ reason }),
+        })
+    }
+
+    // Real UPI checkout (Razorpay QR) — polling + resolution
+    async getPaymentStatus(billId) {
+        return this.request(`/bills/${billId}/payment-status`)
+    }
+
+    async closePayment(billId) {
+        return this.request(`/bills/${billId}/payment/close`, {
+            method: 'POST',
+        })
+    }
+
+    async overridePayment(billId, paymentMethod, note = '') {
+        return this.request(`/bills/${billId}/payment/override`, {
+            method: 'POST',
+            body: JSON.stringify({ payment_method: paymentMethod, note }),
         })
     }
 
@@ -686,6 +687,22 @@ class ApiService {
     async deleteSupplier(supplierId) {
         return this.request(`/suppliers/${supplierId}`, {
             method: 'DELETE',
+        })
+    }
+
+    // Profile
+    async updateProfile(data) {
+        return this.request('/auth/me', {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        })
+    }
+
+    // Telegram bot linking
+    async linkTelegram(code) {
+        return this.request('/telegram/link', {
+            method: 'POST',
+            body: JSON.stringify({ code }),
         })
     }
 

@@ -8,6 +8,12 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# Run tests against a dedicated SQLite file so the shared dev DB
+# (kadaigpt.db) is never polluted with test rows — without this, unique
+# constraints (e.g. purchase_orders.order_number) collide on the second run.
+# Must be set before app.database/config are imported below.
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///./kadaigpt_test.db")
+
 from app.middleware.security import rate_limiter
 from app.database import init_db, engine
 
@@ -15,18 +21,22 @@ from app.database import init_db, engine
 @pytest.fixture(scope="session", autouse=True)
 def _init_test_database():
     """
-    Create all SQLite tables before the test session runs.
+    Create all SQLite tables before the test session runs, on a clean DB.
 
     backend/main.py's lifespan calls init_db() (Base.metadata.create_all) on
     ASGI startup, but every test here uses TestClient(app) without `with`, so
-    lifespan never fires. On a fresh local.db that leaves zero tables, and
-    every DB-touching test fails with "no such table: users" etc.
+    lifespan never fires. On a fresh DB that leaves zero tables, and every
+    DB-touching test fails with "no such table: users" etc.
 
     init_db() is run via asyncio.run() in its own throwaway event loop, then
     engine.dispose() discards any pooled aiosqlite connections opened in that
     loop so later requests (running in whatever loop TestClient/httpx uses)
     open fresh connections instead of reusing ones bound to a dead loop.
     """
+    # Start each run from a clean file (see the DATABASE_URL override above).
+    test_db = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "kadaigpt_test.db")
+    if os.path.exists(test_db):
+        os.remove(test_db)
     asyncio.run(init_db())
     asyncio.run(engine.dispose())
 

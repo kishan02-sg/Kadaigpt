@@ -91,6 +91,13 @@ class Settings(BaseSettings):
     # frontend for Checkout.js; Key Secret stays server-side only.
     RAZORPAY_KEY_ID: Optional[str] = None
     RAZORPAY_KEY_SECRET: Optional[str] = None
+    # Razorpay webhook secret — set in the Razorpay dashboard. Genuinely
+    # SEPARATE from KEY_SECRET: webhook payloads are HMAC-signed with this
+    # value, and the payments webhook rejects anything it can't verify.
+    RAZORPAY_WEBHOOK_SECRET: Optional[str] = None
+    # How long a checkout UPI QR stays payable before it expires (seconds).
+    # The frontend countdown and the backend expiry both use this.
+    upi_payment_timeout_seconds: int = 180
     
     # Allowed Hosts (production)
     allowed_hosts: str = "localhost,127.0.0.1,kadaigpt.onrender.com,kadaigpt.vercel.app"

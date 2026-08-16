@@ -80,17 +80,34 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 
 
-# Rate limit configurations per endpoint type
+# Rate limit configurations per endpoint type. The auth budget is wired to
+# settings.auth_rate_limit_per_minute (5/min in production; e2e/dev
+# environments can raise it via AUTH_RATE_LIMIT_PER_MINUTE without weakening
+# the shipped default).
+from app.config import settings as _settings
+
 RATE_LIMITS = {
-    'auth': {'max': 5, 'window': 60},      # 5 auth attempts per minute
+    'auth': {'max': _settings.auth_rate_limit_per_minute, 'window': 60},  # N auth attempts per minute
     'ocr': {'max': 10, 'window': 60},      # 10 OCR requests per minute
     'api': {'max': 100, 'window': 60},     # 100 API calls per minute
     'bulk': {'max': 10, 'window': 300},    # 10 bulk operations per 5 minutes
 }
 
 
-def get_rate_limit_type(path: str) -> str:
+# Read-only profile lookups run on every app load (GET /auth/me) and staff
+# listing (GET /auth/staff/list). They are not login attempts — counting them
+# against the 5/min auth bucket throttles real registrations/logins after just
+# a few page loads. Route them to the general API bucket instead.
+AUTH_READ_PATHS = {
+    "/api/v1/auth/me",
+    "/api/v1/auth/staff/list",
+}
+
+
+def get_rate_limit_type(path: str, method: str = "GET") -> str:
     """Determine rate limit type from request path"""
+    if method == "GET" and path in AUTH_READ_PATHS:
+        return 'api'
     if '/auth/' in path:
         return 'auth'
     elif '/ocr/' in path:

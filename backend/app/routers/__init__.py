@@ -13,6 +13,7 @@ from app.routers.whatsapp import router as whatsapp_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.analytics import router as analytics_router
 from app.routers.notifications import router as notifications_router
+from app.routers.payments import router as payments_router
 
 __all__ = [
     "auth_router",
@@ -25,7 +26,8 @@ __all__ = [
     "whatsapp_router",
     "dashboard_router",
     "analytics_router",
-    "notifications_router"
+    "notifications_router",
+    "payments_router"
 ]
 
 

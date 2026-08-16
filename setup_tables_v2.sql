@@ -26,7 +26,7 @@ DROP TYPE IF EXISTS ocrconfidence CASCADE;
 
 -- Create enum types (UPPERCASE to match SQLAlchemy)
 CREATE TYPE userrole AS ENUM ('OWNER', 'MANAGER', 'CASHIER');
-CREATE TYPE billstatus AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'REFUNDED');
+CREATE TYPE billstatus AS ENUM ('DRAFT', 'COMPLETED', 'CANCELLED', 'REFUNDED', 'PENDING_PAYMENT');
 CREATE TYPE paymentmethod AS ENUM ('CASH', 'UPI', 'CARD', 'CREDIT');
 CREATE TYPE syncstatus AS ENUM ('PENDING', 'SYNCED', 'FAILED');
 CREATE TYPE ocrconfidence AS ENUM ('HIGH', 'MEDIUM', 'LOW');
@@ -54,6 +54,7 @@ CREATE TABLE users (
     store_id INTEGER NOT NULL REFERENCES stores(id),
     email VARCHAR(255) UNIQUE NOT NULL,
     phone VARCHAR(20) UNIQUE,
+    telegram_chat_id VARCHAR(64) UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(200) NOT NULL,
     role userrole DEFAULT 'CASHIER',
@@ -127,6 +128,26 @@ CREATE TABLE bills (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ
 );
+
+-- 5b. Payments (Razorpay checkout-QR UPI verification)
+-- razorpay_payment_id UNIQUE is the webhook idempotency guard: a replayed
+-- qr_code.credited event violates the constraint instead of double-crediting.
+CREATE TABLE payments (
+    id SERIAL PRIMARY KEY,
+    bill_id INTEGER NOT NULL REFERENCES bills(id),
+    razorpay_qr_code_id VARCHAR(100),
+    razorpay_payment_id VARCHAR(100) UNIQUE,
+    amount FLOAT NOT NULL,
+    status VARCHAR(20) DEFAULT 'pending',
+    qr_image_url VARCHAR(500),
+    expires_at TIMESTAMPTZ,
+    paid_at TIMESTAMPTZ,
+    note VARCHAR(255),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ
+);
+CREATE INDEX idx_payments_bill ON payments(bill_id);
+CREATE INDEX idx_payments_qr ON payments(razorpay_qr_code_id);
 
 -- 6. Bill Items
 CREATE TABLE bill_items (
@@ -267,7 +288,7 @@ CREATE TABLE suppliers (
     store_id INTEGER NOT NULL REFERENCES stores(id),
     name VARCHAR(200) NOT NULL,
     contact VARCHAR(200),
-    phone VARCHAR(20) NOT NULL,
+    phone VARCHAR(20),
     email VARCHAR(200),
     address TEXT,
     category VARCHAR(100) DEFAULT 'General',
@@ -328,5 +349,7 @@ CREATE INDEX idx_bills_store_date ON bills(store_id, created_at DESC);
 CREATE INDEX idx_bills_bill_number ON bills(bill_number);
 CREATE INDEX idx_bill_items_bill ON bill_items(bill_id);
 CREATE INDEX idx_customers_store_phone ON customers(store_id, phone);
+-- Offline-sync dedup: a retried bill POST must not create a duplicate row.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_bills_store_local_id ON bills(store_id, local_id);
 CREATE INDEX idx_users_store ON users(store_id);
 CREATE INDEX idx_daily_summaries_store_date ON daily_summaries(store_id, summary_date DESC);

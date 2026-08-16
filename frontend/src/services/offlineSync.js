@@ -83,6 +83,15 @@ class OfflineSyncService {
         console.log(`[Offline] Queued request: ${item.method} ${item.url} (${queue.length} in queue)`)
     }
 
+    /**
+     * Exponential backoff for retried items: 1s, 2s, 4s, 8s, ... capped at
+     * 30s, plus jitter so a burst of retries doesn't stampede the server.
+     */
+    _backoffDelay(retries) {
+        const base = Math.min(1000 * 2 ** retries, 30000)
+        return base + Math.random() * 1000
+    }
+
     async processQueue() {
         if (this.syncInProgress || !this.isOnline) return
 
@@ -92,8 +101,9 @@ class OfflineSyncService {
         this.syncInProgress = true
         console.log(`[Offline] Processing ${queue.length} queued requests...`)
 
-        const results = { success: 0, failed: 0 }
+        const results = { success: 0, failed: 0, deferred: 0 }
         const remaining = []
+        let soonestRetryAt = Infinity
 
         // Use the CURRENT auth token at sync time. The token stored when the
         // request was queued may be missing or expired, which would 401 every
@@ -101,6 +111,15 @@ class OfflineSyncService {
         const token = localStorage.getItem('kadai_token')
 
         for (const item of queue) {
+            // Item is mid-backoff — leave it queued (not a failure) and wake
+            // up when its window opens.
+            if (item.retryAt && Date.now() < item.retryAt) {
+                remaining.push(item)
+                results.deferred++
+                soonestRetryAt = Math.min(soonestRetryAt, item.retryAt)
+                continue
+            }
+
             try {
                 const headers = { ...(item.headers || {}) }
                 if (token) headers['Authorization'] = `Bearer ${token}`
@@ -113,9 +132,12 @@ class OfflineSyncService {
 
                 if (response.status === 401) {
                     // Not authenticated (logged out / token revoked) — keep the item
-                    // queued so it can sync after the user logs back in.
+                    // queued so it can sync after the user logs back in. Pace it so
+                    // it isn't hammered on every reconnect.
+                    item.retryAt = Date.now() + 60000
                     remaining.push(item)
-                    results.failed++
+                    results.deferred++
+                    soonestRetryAt = Math.min(soonestRetryAt, item.retryAt)
                     console.warn(`[Offline] 401 on ${item.url} — will retry after re-login`)
                     continue
                 }
@@ -123,19 +145,30 @@ class OfflineSyncService {
                 if (response.ok) {
                     results.success++
                     console.log(`[Offline] Synced: ${item.method} ${item.url}`)
+                    // A queued bill was successfully created server-side — drop
+                    // its record from the offline-bills list so it doesn't
+                    // linger forever as "pending sync".
+                    if (item.offlineBillId) {
+                        this.removeOfflineBill(item.offlineBillId)
+                    }
                 } else if (response.status >= 500 && item.retries < item.maxRetries) {
-                    // Server error - retry later
+                    // Transient server error — retry with backoff, don't drop.
                     item.retries++
+                    item.retryAt = Date.now() + this._backoffDelay(item.retries)
                     remaining.push(item)
                     results.failed++
+                    soonestRetryAt = Math.min(soonestRetryAt, item.retryAt)
+                    console.warn(`[Offline] ${response.status} on ${item.url} — retry ${item.retries}/${item.maxRetries} in ~${Math.round((item.retryAt - Date.now()) / 1000)}s`)
                 } else {
                     results.failed++
-                    console.warn(`[Offline] Failed permanently: ${item.method} ${item.url}`)
+                    console.warn(`[Offline] Failed permanently: ${item.method} ${item.url} (${response.status})`)
                 }
             } catch (error) {
                 if (item.retries < item.maxRetries) {
                     item.retries++
+                    item.retryAt = Date.now() + this._backoffDelay(item.retries)
                     remaining.push(item)
+                    soonestRetryAt = Math.min(soonestRetryAt, item.retryAt)
                 }
                 results.failed++
             }
@@ -145,7 +178,17 @@ class OfflineSyncService {
         localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(remaining))
 
         this.syncInProgress = false
-        console.log(`[Offline] Sync complete: ${results.success} synced, ${results.failed} failed, ${remaining.length} remaining`)
+        console.log(`[Offline] Sync complete: ${results.success} synced, ${results.failed} failed, ${results.deferred} deferred, ${remaining.length} remaining`)
+
+        // Notify UI (OfflineIndicator etc.) that the pending count changed
+        window.dispatchEvent(new Event('kadaigpt:offline-queue-changed'))
+
+        // Auto-retry deferred/backed-off items when their window opens — no
+        // reconnect needed.
+        if (soonestRetryAt !== Infinity) {
+            const delay = Math.max(0, soonestRetryAt - Date.now())
+            setTimeout(() => this.processQueue(), delay)
+        }
 
         return results
     }
@@ -184,7 +227,10 @@ class OfflineSyncService {
         // Also queue the API call for sync
         this.addToQueue({
             method: 'POST',
-            url: '/api/v1/bills/',
+            // No trailing slash — the bills route is POST /api/v1/bills;
+            // /api/v1/bills/ answers 405, which silently dropped every
+            // offline bill at sync time (caught by the e2e offline test).
+            url: '/api/v1/bills',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(billData),
             type: 'bill',

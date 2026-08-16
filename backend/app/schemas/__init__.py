@@ -227,10 +227,34 @@ class BillResponse(BaseModel):
     
     items: List[BillItemResponse]
     
+    # Present only when the bill was created with a real Razorpay checkout QR
+    # (UPI + Razorpay configured). Absent = manual-trust flow (no verification).
+    payment: Optional["PaymentInfo"] = None
+    
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class PaymentInfo(BaseModel):
+    """Razorpay checkout-QR payment attached to a bill."""
+    id: int
+    status: str  # pending | paid | expired | overridden | failed
+    amount: float
+    qr_image_url: Optional[str] = None
+    razorpay_qr_code_id: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    paid_at: Optional[datetime] = None
+    razorpay_payment_id: Optional[str] = None
+
+
+class PaymentStatusResponse(BaseModel):
+    """Polled by the checkout screen while waiting for UPI confirmation."""
+    bill_id: int
+    bill_number: str
+    bill_status: BillStatusEnum
+    payment: Optional[PaymentInfo] = None
 
 
 class BillSummary(BaseModel):

@@ -168,6 +168,38 @@ from app.routers.agents import router as agents_router
 app.include_router(agents_router, prefix=settings.api_v1_prefix)
 print("🤖 AI Agents router enabled")
 
+# Include the rest of the API surface (kept in sync with app/main.py so the
+# local/test entrypoint exposes the same routes as the deployed app)
+from app.routers.expenses import router as expenses_router
+app.include_router(expenses_router, prefix=settings.api_v1_prefix)  # /api/v1/expenses
+
+from app.routers.telegram import router as telegram_router
+app.include_router(telegram_router, prefix=settings.api_v1_prefix)  # /api/v1/telegram/*
+
+from app.routers.subscription import router as subscription_router
+app.include_router(subscription_router, prefix=settings.api_v1_prefix)
+
+from app.routers.gst import router as gst_router
+app.include_router(gst_router, prefix=settings.api_v1_prefix)  # /api/v1/gst/*
+
+from app.routers.credit import router as credit_router
+app.include_router(credit_router, prefix=settings.api_v1_prefix)
+
+from app.routers.audit import router as audit_router
+app.include_router(audit_router)  # Already has /api/audit prefix
+
+from app.routers.inapp_notifications import router as inapp_notifications_router
+app.include_router(inapp_notifications_router)  # Already has /api/notifications prefix
+
+from app.routers.backup import router as backup_router
+app.include_router(backup_router, prefix=settings.api_v1_prefix)  # /api/v1/backup
+
+from app.routers.privacy import router as privacy_router
+app.include_router(privacy_router, prefix=settings.api_v1_prefix)  # /api/v1/privacy
+
+from app.routers.admin import router as admin_router
+app.include_router(admin_router, prefix=settings.api_v1_prefix)  # /api/v1/admin/*
+
 # Add security middleware if available
 if SECURITY_MIDDLEWARE_AVAILABLE:
     app.add_middleware(SecurityMiddleware)

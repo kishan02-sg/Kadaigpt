@@ -4,6 +4,7 @@ import { Search, Plus, Minus, Trash2, Printer, Save, ShoppingCart, X, Eye, Loade
 import realDataService from '../services/realDataService'
 import whatsappService from '../services/whatsapp'
 import api from '../services/api'
+import offlineSync from '../services/offlineSync'
 import { trackBillCreated } from '../components/CelebrationEngine'
 import { demoProducts } from '../services/demoData'
 import BarcodeScanner from '../components/BarcodeScanner'
@@ -37,11 +38,61 @@ export default function CreateBill({ addToast, setCurrentPage }) {
   const [customerSuggestions, setCustomerSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
 
+  // Real UPI checkout (Razorpay QR): while set, the payment modal shows the
+  // QR and polls the backend until the qr_code.credited webhook confirms.
+  const [upiCheckout, setUpiCheckout] = useState(null) // { billId, billNumber, qrImageUrl, amount, expiresAt }
+  const [upiState, setUpiState] = useState(null)       // null | waiting | paid | expired | cancelled | overridden
+  const [upiRemaining, setUpiRemaining] = useState(0)  // seconds until QR expiry
+
   useEffect(() => {
     loadProducts()
     loadCustomers()
     loadOcrDraft()
   }, [])
+
+  // Poll the backend while a UPI checkout waits for the webhook confirmation.
+  // Runs even if the cashier dismisses the modal, so a late payment still
+  // flips the bill (and the next poll notices) without any cashier action.
+  useEffect(() => {
+    if (!upiCheckout || upiState !== 'waiting') return
+    const poll = async () => {
+      try {
+        const st = await api.getPaymentStatus(upiCheckout.billId)
+        if (st.bill_status === 'COMPLETED') {
+          setUpiState('paid')
+          realDataService.invalidateCache()
+          addToast('✅ UPI payment confirmed — bill completed!', 'success')
+        } else if (st.bill_status === 'CANCELLED') {
+          setUpiState('cancelled')
+        }
+      } catch (e) {
+        // Transient network error — keep polling; the next tick will retry.
+      }
+    }
+    poll()
+    const iv = setInterval(poll, 2500)
+    return () => clearInterval(iv)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upiCheckout, upiState])
+
+  // Countdown to QR expiry.
+  useEffect(() => {
+    if (!upiCheckout || upiState !== 'waiting' || !upiCheckout.expiresAt) return
+    const deadline = new Date(upiCheckout.expiresAt).getTime()
+    const tick = () => setUpiRemaining(Math.max(0, Math.floor((deadline - Date.now()) / 1000)))
+    tick()
+    const iv = setInterval(tick, 1000)
+    return () => clearInterval(iv)
+  }, [upiCheckout, upiState])
+
+  // When the countdown hits zero, close the QR server-side (idempotent —
+  // closing an already-closed checkout is a no-op) and show the expired state.
+  useEffect(() => {
+    if (upiCheckout && upiState === 'waiting' && upiRemaining <= 0) {
+      handleCloseCheckout('expired')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [upiRemaining, upiState])
 
   const loadOcrDraft = () => {
     const draft = sessionStorage.getItem('kadai_ocr_draft')
@@ -356,11 +407,78 @@ export default function CreateBill({ addToast, setCurrentPage }) {
     }
   }
 
+  const queueBillOffline = (billData) => {
+    // Unique local id so a retried sync never creates a duplicate
+    // (the backend dedups on local_id).
+    const localId = `offline_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const billDataWithLocalId = { ...billData, local_id: localId }
+
+    // queueBill() stores the bill in localStorage AND queues the POST for sync
+    const offlineBill = offlineSync.queueBill(billDataWithLocalId)
+    setBillNumber(offlineBill.bill_number)
+
+    // Local stock decrement — same UX as the online path, so the screen
+    // reflects exactly what was just sold
+    setProducts(prev => prev.map(p => {
+      const cartItem = cart.find(c => c.id === p.id)
+      if (cartItem) {
+        const newStock = Math.max(0, (p.stock || p.current_stock || 0) - cartItem.quantity)
+        return { ...p, stock: newStock, current_stock: newStock }
+      }
+      return p
+    }))
+
+    // Let OfflineIndicator refresh its pending count immediately
+    window.dispatchEvent(new Event('kadaigpt:offline-queue-changed'))
+    return offlineBill
+  }
+
+  const resetUpiCheckout = () => {
+    setUpiCheckout(null)
+    setUpiState(null)
+    setUpiRemaining(0)
+  }
+
+  // Cashier cancelled the checkout or the QR expired: close it on the server
+  // (Razorpay QR closed, stock restored, bill cancelled). Idempotent.
+  const handleCloseCheckout = async (reason) => {
+    if (!upiCheckout) return
+    try {
+      await api.closePayment(upiCheckout.billId)
+      realDataService.invalidateCache()
+    } catch (e) {
+      addToast('⚠️ ' + (e.message || 'Could not close the checkout'), 'error')
+    } finally {
+      setUpiState(reason === 'expired' ? 'expired' : 'cancelled')
+    }
+  }
+
+  // Escape hatch: QR was never paid, but the customer did pay by some other
+  // means. Records the sale under CASH/CARD/CREDIT — explicitly NOT a
+  // Razorpay confirmation (Payment.status becomes 'overridden'), so reports
+  // can always tell verified UPI apart from manual entries.
+  const handleOverrideCheckout = async (method) => {
+    if (!upiCheckout) return
+    try {
+      await api.overridePayment(upiCheckout.billId, method, 'cashier recorded manually at checkout')
+      setPaymentMode(method === 'CASH' ? 'Cash' : method === 'CARD' ? 'Card' : 'Due')
+      setUpiState('overridden')
+      realDataService.invalidateCache()
+      addToast(`✅ Bill ${upiCheckout.billNumber} recorded as ${method} (manual — not Razorpay-verified)`, 'success')
+    } catch (e) {
+      addToast('❌ ' + (e.message || 'Could not record the payment'), 'error')
+    }
+  }
+
   const handleSaveBill = async () => {
     if (cart.length === 0) {
       addToast('Add items to cart first', 'error')
       return
     }
+
+    // Start every save with a clean checkout state (a previous bill's QR must
+    // never leak into this one).
+    resetUpiCheckout()
 
     const billData = getBillData()
     console.log('📝 Creating bill with payment mode:', paymentMode)
@@ -416,6 +534,14 @@ export default function CreateBill({ addToast, setCurrentPage }) {
         addToast('Redirecting to All Bills...', 'info')
         setTimeout(() => setCurrentPage?.('bills'), 500)
       }, 1500)
+      return
+    }
+
+    // Offline fast-path: queue the bill locally and skip the API entirely
+    if (!navigator.onLine) {
+      const offlineBill = queueBillOffline(billData)
+      addToast(`📥 Bill ${offlineBill.bill_number} saved offline — will sync when connected`, 'warning')
+      clearCart()
       return
     }
 
@@ -499,12 +625,28 @@ export default function CreateBill({ addToast, setCurrentPage }) {
 
       // BUG-007 FIX: Show bill preview modal immediately instead of redirecting
       setShowPayment(true)
-      addToast(`✅ Bill ${apiNewBillNumber} created - ₹${total.toFixed(2)} (${paymentMode})`, 'success')
+
+      // Real UPI checkout: the backend held the bill in PENDING_PAYMENT and
+      // returned a Razorpay QR. Show it and wait for the webhook instead of
+      // pretending the money arrived.
+      if (result.payment && result.payment.qr_image_url) {
+        setUpiCheckout({
+          billId: result.id,
+          billNumber: apiNewBillNumber,
+          qrImageUrl: result.payment.qr_image_url,
+          amount: result.total_amount ?? total,
+          expiresAt: result.payment.expires_at,
+        })
+        setUpiState('waiting')
+        addToast(`⏳ UPI QR shown — waiting for payment confirmation…`, 'info')
+      } else {
+        addToast(`✅ Bill ${apiNewBillNumber} created - ₹${total.toFixed(2)} (${paymentMode})`, 'success')
+      }
 
       // Invalidate cache so Bills/Dashboard pages get fresh data immediately
       realDataService.invalidateCache()
 
-      // Re-fetch products in background to get accurate stock from server
+      // Re-fetch products in background to get accurate stock from the server
       setTimeout(() => loadProducts(), 1500)
 
     } catch (error) {
@@ -537,11 +679,23 @@ export default function CreateBill({ addToast, setCurrentPage }) {
         return
       }
 
-      // Offline fallback
-      const newBillNumber = `INV-${Date.now().toString().slice(-6)}`
-      setBillNumber(newBillNumber)
-      addToast('Bill saved locally - will sync when connected', 'warning')
-      clearCart()
+      // Genuine network failure → queue the bill for sync (NOT a swallowed error)
+      const isNetworkFailure =
+        !navigator.onLine ||
+        error instanceof TypeError ||
+        error?.message?.includes('Failed to fetch') ||
+        error?.message?.includes('Offline - Request queued')
+
+      if (isNetworkFailure) {
+        const offlineBill = queueBillOffline(billData)
+        addToast(`📥 Bill ${offlineBill.bill_number} saved offline — will sync when connected`, 'warning')
+        clearCart()
+        return
+      }
+
+      // Real server error (a 4xx/5xx that isn't stock/409) — surface it and
+      // keep the cart so nothing is lost behind a fake "saved" message.
+      addToast(`❌ ${error.message || 'Could not save the bill'}. Please check and try again.`, 'error')
     }
   }
 
@@ -942,10 +1096,53 @@ export default function CreateBill({ addToast, setCurrentPage }) {
         <div className="modal-overlay" onClick={() => setShowPayment(false)}>
           <div className="modal payment-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">🎉 Bill Created!</h3>
+              <h3 className="modal-title">
+                {upiCheckout && upiState === 'waiting' ? '⏳ Waiting for UPI Payment'
+                  : upiCheckout && upiState === 'expired' ? '⏱️ QR Expired'
+                  : upiCheckout && upiState === 'cancelled' ? 'Bill Cancelled'
+                  : '🎉 Bill Created!'}
+              </h3>
               <button className="modal-close" onClick={() => setShowPayment(false)}><X size={20} /></button>
             </div>
             <div className="modal-body">
+              {/* Real UPI checkout (Razorpay QR): waiting / expired / cancelled panels */}
+              {upiCheckout && upiState === 'waiting' && (
+                <div className="upi-checkout-panel" style={{ textAlign: 'center' }}>
+                  <div className="success-icon" style={{ background: '#f59e0b' }}>📱</div>
+                  <h4>Scan &amp; Pay with any UPI app</h4>
+                  <p className="bill-number">{upiCheckout.billNumber}</p>
+                  <div className="bill-amount">₹{(upiCheckout.amount || 0).toLocaleString('en-IN')}</div>
+                  <img
+                    src={upiCheckout.qrImageUrl}
+                    alt="UPI QR Code"
+                    style={{ width: 200, height: 200, background: 'white', borderRadius: 12, padding: 12, margin: '12px auto', display: 'block', border: '2px solid var(--border-subtle)' }}
+                  />
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    ⏳ Waiting for payment — auto-verified when it arrives
+                  </div>
+                  <div style={{ fontSize: '0.9rem', marginTop: 6, fontWeight: 600, color: upiRemaining <= 30 ? '#ef4444' : 'var(--text-primary)' }}>
+                    QR expires in {Math.floor(upiRemaining / 60)}:{String(upiRemaining % 60).padStart(2, '0')}
+                  </div>
+                </div>
+              )}
+
+              {upiCheckout && (upiState === 'expired' || upiState === 'cancelled') && (
+                <div className="upi-checkout-panel" style={{ textAlign: 'center' }}>
+                  <div className="success-icon" style={{ background: upiState === 'expired' ? '#ef4444' : '#6b7280' }}>
+                    {upiState === 'expired' ? '⏱️' : '✕'}
+                  </div>
+                  <h4>{upiState === 'expired' ? 'QR Expired' : 'Bill Cancelled'}</h4>
+                  <p className="bill-number">{upiCheckout.billNumber}</p>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '6px 0 0' }}>
+                    {upiState === 'expired'
+                      ? 'No payment received within the time limit. Stock was returned.'
+                      : 'This checkout was closed. Stock was returned.'}
+                  </p>
+                </div>
+              )}
+
+              {(!upiCheckout || upiState === 'paid' || upiState === 'overridden') && (
+              <>
               <div className="bill-success">
                 <div className="success-icon">✓</div>
                 <h4>Invoice Generated</h4>
@@ -1028,10 +1225,12 @@ export default function CreateBill({ addToast, setCurrentPage }) {
                 </div>
               )}
 
-              {/* UPI QR Code — shows when UPI selected */}
-              {paymentMode === 'UPI' && (
+              {/* Manual UPI QR Code — only when NO Razorpay checkout is active
+                  (Razorpay not configured, or payment already confirmed). Labeled
+                  unverified: nothing confirms the money arrived. */}
+              {paymentMode === 'UPI' && !upiCheckout && (
                 <div style={{ marginTop: 16, padding: 14, background: 'var(--bg-tertiary)', borderRadius: 12, textAlign: 'center' }}>
-                  <label className="form-label" style={{ marginBottom: 8 }}>📱 Scan to Pay</label>
+                  <label className="form-label" style={{ marginBottom: 8 }}>📱 Manual UPI (unverified)</label>
                   <div style={{
                     width: 180, height: 180, margin: '12px auto',
                     background: 'white', borderRadius: 12, padding: 12,
@@ -1059,22 +1258,50 @@ export default function CreateBill({ addToast, setCurrentPage }) {
                   </div>
                 </div>
               )}
+              </>
+              )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => { setShowPayment(false); clearCart(); }}>
-                New Bill
-              </button>
-              <button
-                className="btn btn-success"
-                onClick={handleSendWhatsApp}
-                disabled={!customer.phone}
-                title={!customer.phone ? 'Add customer phone to send via WhatsApp' : 'Send bill via WhatsApp'}
-              >
-                <MessageSquare size={18} /> WhatsApp
-              </button>
-              <button className="btn btn-primary" onClick={handlePrint} disabled={printing}>
-                {printing ? <><Loader2 size={18} className="spin" /> Printing...</> : <><Printer size={18} /> Print Receipt</>}
-              </button>
+              {upiCheckout && upiState === 'waiting' ? (
+                <>
+                  <button className="btn btn-secondary" onClick={() => handleCloseCheckout('cancel')}>
+                    ✕ Cancel Bill
+                  </button>
+                  <button className="btn btn-success" onClick={() => handleOverrideCheckout('CASH')}>
+                    💵 Record as Cash
+                  </button>
+                </>
+              ) : upiCheckout && upiState === 'expired' ? (
+                <>
+                  <button className="btn btn-secondary" onClick={() => handleCloseCheckout('cancel')}>
+                    ✕ Cancel Bill
+                  </button>
+                  <button className="btn btn-success" onClick={() => handleOverrideCheckout('CASH')}>
+                    💵 Customer paid — record as Cash
+                  </button>
+                </>
+              ) : upiCheckout && upiState === 'cancelled' ? (
+                <button className="btn btn-primary" onClick={() => { resetUpiCheckout(); setShowPayment(false); clearCart(); }}>
+                  New Bill
+                </button>
+              ) : (
+                <>
+                  <button className="btn btn-secondary" onClick={() => { setShowPayment(false); clearCart(); resetUpiCheckout(); }}>
+                    New Bill
+                  </button>
+                  <button
+                    className="btn btn-success"
+                    onClick={handleSendWhatsApp}
+                    disabled={!customer.phone}
+                    title={!customer.phone ? 'Add customer phone to send via WhatsApp' : 'Send bill via WhatsApp'}
+                  >
+                    <MessageSquare size={18} /> WhatsApp
+                  </button>
+                  <button className="btn btn-primary" onClick={handlePrint} disabled={printing}>
+                    {printing ? <><Loader2 size={18} className="spin" /> Printing...</> : <><Printer size={18} /> Print Receipt</>}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

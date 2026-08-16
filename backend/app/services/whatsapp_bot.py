@@ -314,8 +314,8 @@ _Powered by KadaiGPT AI_ 🤖"""
                 'confidence': 0.9
             },
             'add_product': {
-                'keywords': ['add product', 'new product', 'add item', 'create product'],
-                'patterns': [r'(add|create|new).*(product|item)', r'i want to add'],
+                'keywords': ['add product', 'new product', 'add item', 'create product', 'add'],
+                'patterns': [r'(add|create|new).*(product|item)', r'i want to add', r'^add\b'],
                 'confidence': 0.9
             },
             'report': {
@@ -346,6 +346,25 @@ _Powered by KadaiGPT AI_ 🤖"""
                 'patterns': [r'(send|set).*(reminder|alert)', r'remind.*(customer|client)',
                             r'follow up with'],
                 'confidence': 0.85
+            },
+            'price_query': {
+                'keywords': ['price', 'rate', 'cost', 'how much', 'விலை', 'कीमत'],
+                'patterns': [r'(price|rate|cost).*(of|for)', r'how much (is|for)',
+                            r'check.*(price|rate)'],
+                'questions': ['what is the price', 'price of', 'rate of'],
+                'confidence': 0.85
+            },
+            'send_bill': {
+                'keywords': ['sendbill', 'send bill', 'share bill', 'bill send'],
+                'patterns': [r'sendbill.*', r'(send|share).*(bill|receipt)'],
+                'confidence': 0.9
+            },
+            'create_order': {
+                'keywords': ['neworder', 'purchase order', 'new order', 'create order', 'po', 'ஆர்டர்'],
+                'patterns': [r'(create|make|new).*(order|purchase order)', r'order.*(supplier)',
+                            r'neworder'],
+                'questions': ['create purchase order', 'place an order'],
+                'confidence': 0.9
             },
             'help': {
                 'keywords': ['help', 'commands', 'what can you do', 'how to', 'guide', 'tutorial',
@@ -472,16 +491,74 @@ _Powered by KadaiGPT AI_ 🤖"""
         
         return entities
     
+    async def _resolve_user(self, phone: str, db: AsyncSession):
+        """Look up the registered User by WhatsApp phone number.
+
+        Matches on the last 10 digits so a +91 / 0 prefix difference between
+        what the sender's number looks like and what the user typed at
+        registration never blocks the lookup.
+        """
+        from app.models import User
+
+        digits = re.sub(r"\D", "", phone or "")
+        suffix = digits[-10:]
+        if not suffix:
+            return None
+        result = await db.execute(
+            select(User).where(
+                User.phone.like(f"%{suffix}"),
+                User.is_active == True,  # noqa: E712
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def _resolve_ctx(self, phone: str) -> Optional[Dict[str, Any]]:
+        """Resolve the registered store owner for a WhatsApp number.
+
+        Returns {"user_id", "store_id"} or None when the number isn't linked
+        to a KadaiGPT account. Every owner-side command is store-scoped — we
+        never act on fake/no data.
+        """
+        from app.database import async_session_maker
+
+        try:
+            async with async_session_maker() as db:
+                user = await self._resolve_user(phone, db)
+                if not user or not user.store_id:
+                    return None
+                return {"user_id": user.id, "store_id": user.store_id}
+        except Exception as e:
+            logger.error(f"[WA] user resolution failed for {phone}: {e}")
+            return None
+
+    def _registration_prompt(self, phone: str) -> str:
+        """Clear message for numbers not linked to a KadaiGPT account."""
+        return (
+            "⚠️ *Your WhatsApp number isn't linked to a KadaiGPT account.*\n\n"
+            "To use the bot, register this number in the KadaiGPT app:\n"
+            "1. Open the app → *Settings*\n"
+            "2. Set your *phone number* (Profile) to the number you're messaging from\n"
+            "3. Send any message here again\n\n"
+            "_Your number is matched automatically — no other setup needed._"
+        )
+
     async def process_incoming_message(self, phone: str, message: str, user_id: Optional[int] = None) -> str:
         """Process incoming message using AI-powered NLP or fallback to rule-based"""
-        
+
         original_msg = message.strip()
-        clean_msg = message.strip().lower()
-        
-        # Check for conversation state (multi-step commands)
+
+        # Check for conversation state (multi-step commands) — the state carries
+        # the resolved user/store, so no re-resolution needed mid-flow.
         if phone in self._conversation_states:
             return await self._handle_conversation(phone, original_msg)
-        
+
+        # Resolve the registered store owner for this number. Unregistered
+        # numbers get told to register — never fake data, never a silent crash.
+        ctx = await self._resolve_ctx(phone)
+        if ctx is None:
+            logger.info(f"[WA] unregistered number tried owner commands: {phone}")
+            return self._registration_prompt(phone)
+
         # Try AI-powered NLP first (if available)
         if self.ai_enabled and self.nlp_service:
             try:
@@ -490,28 +567,28 @@ _Powered by KadaiGPT AI_ 🤖"""
                     intent = ai_result.get("intent", "unknown")
                     entities = ai_result.get("entities", {})
                     confidence = ai_result.get("confidence", 0)
-                    
+
                     logger.info(f"AI NLP: intent={intent}, confidence={confidence:.2f}")
-                    
+
                     # Use AI's suggested response if it's a general question
                     if intent == "general_question" and ai_result.get("suggested_response"):
                         return ai_result["suggested_response"]
-                    
+
                     # Route to handlers based on AI-detected intent
-                    return await self._route_intent(intent, entities, user_id, phone, original_msg)
+                    return await self._route_intent(intent, entities, ctx, phone, original_msg)
             except Exception as e:
                 logger.warning(f"AI NLP failed, falling back to rules: {e}")
-        
+
         # Fallback to rule-based NLP
         intent_result = self._detect_intent(original_msg)
         intent = intent_result['intent']
         confidence = intent_result['confidence']
         entities = intent_result.get('entities', {})
-        
+
         logger.info(f"Rule-based NLP: intent={intent}, confidence={confidence:.2f}")
-        
+
         # Route to handler
-        return await self._route_intent(intent, entities, user_id, phone, original_msg)
+        return await self._route_intent(intent, entities, ctx, phone, original_msg)
     
     # ════════════════════════════════════════════════════════════════════
     # CUSTOMER-FACING STOREFRONT BOT
@@ -638,66 +715,92 @@ _Powered by KadaiGPT AI_ 🤖"""
             logger.warning(f"[WA] store-aware send failed, using global: {e}")
         return await self.send_message(phone, message)
 
-    async def _route_intent(self, intent: str, entities: Dict, user_id: Optional[int], phone: str, original_msg: str) -> str:
-        """Route to appropriate handler based on intent"""
-        
-        # Route to appropriate handler based on intent
+    async def _route_intent(self, intent: str, entities: Dict, ctx: Dict, phone: str, original_msg: str) -> str:
+        """Route to appropriate handler based on intent.
+
+        ctx = {"user_id", "store_id"} resolved from the sender's phone — every
+        handler is scoped to the caller's store.
+        """
+        store_id = ctx.get("store_id")
+        user_id = ctx.get("user_id")
+
         if intent == 'greeting':
             return self._get_greeting_response()
-        
+
         elif intent == 'help':
             return self._get_help_response()
-        
+
         elif intent == 'thanks':
             return self._get_thanks_response()
-        
+
         elif intent == 'sales_query':
-            return await self._get_sales_response(user_id, entities.get('time_period', 'today'))
-        
+            return await self._get_sales_response(store_id, entities.get('time_period', 'today'))
+
         elif intent == 'expense_query':
-            return await self._get_expense_response(user_id)
-        
+            return await self._get_expense_response(store_id)
+
         elif intent == 'profit_query':
-            return await self._get_profit_response(user_id)
-        
+            return await self._get_profit_response(store_id)
+
         elif intent == 'stock_query':
-            return await self._get_stock_response(user_id)
-        
+            return await self._get_stock_response(store_id)
+
         elif intent == 'bill_query':
-            return await self._get_bills_response(user_id)
-        
+            return await self._get_bills_response(store_id)
+
         elif intent == 'customer_query':
-            return await self._get_customers_response(user_id)
-        
+            return await self._get_customers_response(store_id)
+
         elif intent == 'create_bill':
-            return await self._start_create_bill(phone)
-        
+            return await self._start_create_bill(phone, ctx)
+
         elif intent == 'add_product':
             # Extract product name if provided
             product_name = original_msg.replace('add', '').replace('product', '').replace('item', '').strip()
-            if product_name:
-                return await self._start_add_product(phone, product_name)
-            return await self._start_add_product(phone, "")
-        
+            return await self._start_add_product(phone, product_name, ctx)
+
         elif intent == 'report':
-            return await self._get_daily_report(user_id)
-        
+            return await self._get_daily_report(store_id)
+
         elif intent == 'gst_query':
-            return await self._get_gst_response(user_id)
-        
+            return await self._get_gst_response(store_id)
+
         elif intent == 'pending_payments':
-            return await self._get_pending_payments(user_id)
-        
+            return await self._get_pending_payments(store_id)
+
         elif intent == 'reminder':
             # Extract customer name if provided
             names = entities.get('names', [])
             if names:
-                return await self._send_payment_reminder(phone, names[0])
+                return await self._send_payment_reminder(phone, names[0], ctx)
             return await self._get_reminders_menu(phone)
-        
+
+        elif intent == 'price_query':
+            # Extract product name from the message (strip command words)
+            product = re.sub(
+                r'\b(price|rate|cost|of|for|check|how|much|is|the)\b',
+                '',
+                original_msg, flags=re.IGNORECASE
+            ).strip().strip(':').strip()
+            return await self._get_product_price(store_id, product or original_msg)
+
+        elif intent == 'send_bill':
+            # Extract the bill number (last token, e.g. sendbill INV-20260101-ABCD)
+            bill_no = original_msg.replace('sendbill', '', 1).strip() or None
+            if not bill_no:
+                return (
+                    "📤 *Send Bill*\n\nUsage: `sendbill <bill number>`\n\n"
+                    "Example: `sendbill INV-20260115-AB12`\n\n"
+                    "Type *bills* to see recent bill numbers."
+                )
+            return await self._send_bill_to_customer(store_id, phone, bill_no)
+
+        elif intent == 'create_order':
+            return await self._start_create_order(phone, ctx)
+
         elif intent == 'prediction':
-            return await self._get_ai_predictions(user_id)
-        
+            return await self._get_ai_predictions(store_id)
+
         else:
             # Unknown intent - try to be helpful
             return self._get_smart_fallback(original_msg)
@@ -756,7 +859,7 @@ Try asking me things like:
 
 Or type *help* to see all I can do! 🌟"""
     
-    async def _get_ai_predictions(self, user_id: Optional[int]) -> str:
+    async def _get_ai_predictions(self, store_id: Optional[int]) -> str:
         """Get AI predictions response"""
         # In real implementation, this would call the ML prediction service
         return """🔮 *AI Business Predictions*
@@ -819,12 +922,14 @@ Type *sales* to see current performance."""
     
     # ==================== ADD PRODUCT FLOW ====================
     
-    async def _start_add_product(self, phone: str, product_name: str) -> str:
+    async def _start_add_product(self, phone: str, product_name: str, ctx: Optional[Dict] = None) -> str:
         """Start add product conversation"""
         self._conversation_states[phone] = {
             'action': 'add_product',
             'step': 'get_price',
-            'name': product_name
+            'name': product_name,
+            'user_id': ctx.get('user_id') if ctx else None,
+            'store_id': ctx.get('store_id') if ctx else None,
         }
         return f"""📦 *Adding New Product*
 
@@ -871,21 +976,30 @@ Reply *yes* to confirm or *cancel* to abort."""
         
         elif step == 'confirm':
             if message.lower() in ['yes', 'y', 'confirm']:
-                # TODO: Actually save to database
-                product_data = {
-                    'name': state['name'],
-                    'price': state['price'],
-                    'stock': state['stock']
-                }
+                store_id = state.get('store_id')
+                user_id = state.get('user_id')
+                name = state.get('name', '').strip()
+                price = state.get('price')
+                stock = state.get('stock')
                 del self._conversation_states[phone]
-                
-                return f"""✅ *Product Added Successfully!*
 
-• *Name*: {product_data['name']}
-• *Price*: ₹{product_data['price']}
-• *Stock*: {product_data['stock']} units
+                if not store_id:
+                    return self._registration_prompt(phone)
 
-Type *products* to see all products."""
+                from app.database import async_session_maker
+                from app.services.bot_actions import create_product_for_store
+
+                try:
+                    async with async_session_maker() as db:
+                        ok, msg = await create_product_for_store(
+                            db, store_id, user_id, name, price, stock, source="whatsapp"
+                        )
+                    if ok:
+                        return f"{msg}\n\nType *products* to see all products."
+                    return msg
+                except Exception as e:
+                    logger.error(f"[WA] add product failed: {e}")
+                    return "⚠️ Could not save the product right now. Please try again in a moment."
             else:
                 del self._conversation_states[phone]
                 return "Product not added. Type *help* to see other commands."
@@ -894,12 +1008,14 @@ Type *products* to see all products."""
     
     # ==================== CREATE BILL FLOW ====================
     
-    async def _start_create_bill(self, phone: str) -> str:
+    async def _start_create_bill(self, phone: str, ctx: Optional[Dict] = None) -> str:
         """Start create bill conversation"""
         self._conversation_states[phone] = {
             'action': 'create_bill',
             'step': 'get_customer',
-            'items': []
+            'items': [],
+            'user_id': ctx.get('user_id') if ctx else None,
+            'store_id': ctx.get('store_id') if ctx else None,
         }
         return """🧾 *Create New Bill*
 
@@ -913,7 +1029,15 @@ Type *cancel* to abort."""
         step = state.get('step')
         
         if step == 'get_customer':
-            state['customer'] = message
+            # A 10-13 digit input is a phone number — keeps the customer's phone
+            # so the bill can be sent on WhatsApp (sendbill) after creation.
+            digits = re.sub(r"\D", "", message)
+            if 10 <= len(digits) <= 13:
+                state['customer_phone'] = message.strip()
+                state['customer'] = None
+            else:
+                state['customer'] = message
+                state['customer_phone'] = None
             state['step'] = 'get_items'
             self._conversation_states[phone] = state
             return f"""Customer: *{message}*
@@ -973,17 +1097,38 @@ Add more items or type *done* to finish."""
         
         elif step == 'confirm':
             if message.lower() in ['confirm', 'yes', 'y']:
+                store_id = state.get('store_id')
+                user_id = state.get('user_id')
+                customer = state.get('customer') or "Walk-in"
                 total = sum(item['qty'] * item['price'] for item in state['items'])
-                bill_no = f"BILL{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                
-                # TODO: Actually save to database
                 del self._conversation_states[phone]
-                
+
+                if not store_id:
+                    return self._registration_prompt(phone)
+
+                from app.database import async_session_maker
+                from app.services.bot_actions import create_bill_for_bot
+
+                try:
+                    async with async_session_maker() as db:
+                        ok, detail, _bill = await create_bill_for_bot(
+                            db, store_id, user_id, state['items'],
+                            customer_name=customer,
+                            customer_phone=state.get('customer_phone'),
+                            source="whatsapp",
+                        )
+                    if not ok:
+                        return detail
+                    bill_no = detail
+                except Exception as e:
+                    logger.error(f"[WA] create bill failed: {e}")
+                    return "⚠️ Could not create the bill right now. Please try again in a moment."
+
                 return f"""✅ *Bill Created Successfully!*
 
 📄 Bill No: *{bill_no}*
-👤 Customer: {state['customer']}
-💰 Total: ₹{total}
+👤 Customer: {customer}
+💰 Total: ₹{total:,.2f}
 📅 Date: {datetime.now().strftime('%d %b %Y %I:%M %p')}
 
 To send this bill to customer, type:
@@ -998,12 +1143,14 @@ Type *bills* to see all bills."""
     
     # ==================== CREATE ORDER FLOW ====================
     
-    async def _start_create_order(self, phone: str) -> str:
+    async def _start_create_order(self, phone: str, ctx: Optional[Dict] = None) -> str:
         """Start create purchase order conversation"""
         self._conversation_states[phone] = {
             'action': 'create_order',
             'step': 'get_supplier',
-            'items': []
+            'items': [],
+            'user_id': ctx.get('user_id') if ctx else None,
+            'store_id': ctx.get('store_id') if ctx else None,
         }
         return """📋 *Create Purchase Order*
 
@@ -1018,9 +1165,21 @@ Type *cancel* to abort."""
         
         if step == 'get_supplier':
             state['supplier'] = message
-            state['step'] = 'get_items'
+            state['step'] = 'get_supplier_phone'
             self._conversation_states[phone] = state
             return f"""Supplier: *{message}*
+
+Enter *supplier phone number* (optional, reply *skip*):
+_(e.g., 9876543210)_"""
+        
+        elif step == 'get_supplier_phone':
+            if message.lower() in ('skip', 'skip it', 'none', 'no'):
+                state['supplier_phone'] = None
+            else:
+                state['supplier_phone'] = message.strip()
+            state['step'] = 'get_items'
+            self._conversation_states[phone] = state
+            return f"""Supplier: *{state['supplier']}*
 
 Add items to order in format:
 *product name, quantity*
@@ -1064,12 +1223,30 @@ Reply *confirm* to create PO or *cancel* to abort."""
         
         elif step == 'confirm':
             if message.lower() in ['confirm', 'yes', 'y']:
-                po_no = f"PO{datetime.now().strftime('%Y%m%d%H%M%S')}"
-                items_text = "\n".join([f"• {i['name']} - {i['qty']} units" for i in state['items']])
-                
-                # TODO: Save to database
+                store_id = state.get('store_id')
+                user_id = state.get('user_id')
                 del self._conversation_states[phone]
-                
+
+                if not store_id:
+                    return self._registration_prompt(phone)
+
+                from app.database import async_session_maker
+                from app.services.bot_actions import create_purchase_order_for_store
+
+                try:
+                    async with async_session_maker() as db:
+                        ok, detail, _po = await create_purchase_order_for_store(
+                            db, store_id, user_id, state['supplier'], state['items'],
+                            supplier_phone=state.get('supplier_phone'), source="whatsapp",
+                        )
+                    if not ok:
+                        return detail
+                    po_no = detail
+                except Exception as e:
+                    logger.error(f"[WA] create PO failed: {e}")
+                    return "⚠️ Could not create the order right now. Please try again in a moment."
+
+                items_text = "\n".join([f"• {i['name']} - {i['qty']} units" for i in state['items']])
                 return f"""✅ *Purchase Order Created!*
 
 📋 PO No: *{po_no}*
@@ -1079,7 +1256,7 @@ Reply *confirm* to create PO or *cancel* to abort."""
 *Items:*
 {items_text}
 
-Order ready to send to supplier!"""
+Order saved. View it in the app under *Suppliers → Orders*."""
             else:
                 del self._conversation_states[phone]
                 return "Order cancelled."
@@ -1098,19 +1275,55 @@ Order ready to send to supplier!"""
 
 _Example: remind Ramesh Kumar_"""
     
-    async def _send_payment_reminder(self, phone: str, customer_name: str) -> str:
-        """Send payment reminder to customer"""
-        # TODO: Fetch actual customer data
-        return f"""⏰ *Payment Reminder Prepared*
+    async def _send_payment_reminder(self, phone: str, customer_name: str, ctx: Dict) -> str:
+        """Send a WhatsApp payment reminder to a real customer with pending credit."""
+        store_id = ctx.get("store_id")
+        from app.database import async_session_maker
+        from app.models import Customer
 
-👤 Customer: *{customer_name}*
-💰 Pending: ₹0
-📅 Due Since: -
+        try:
+            async with async_session_maker() as db:
+                result = await db.execute(
+                    select(Customer).where(
+                        Customer.store_id == store_id,
+                        Customer.deleted_at.is_(None),
+                        Customer.name.ilike(customer_name.strip()),
+                    )
+                )
+                customer = result.scalars().first()
+        except Exception as e:
+            logger.error(f"[WA] reminder lookup failed: {e}")
+            return "⚠️ Couldn't look up that customer right now. Please try again."
 
-_Message will be sent to customer's WhatsApp._
+        if not customer:
+            return (
+                f"⚠️ No customer named *{customer_name}* found in your store.\n"
+                "Type *pending* to see customers with outstanding balances."
+            )
 
-Reply *confirm* to send reminder."""
-    
+        pending = customer.credit or 0
+        if pending <= 0:
+            return f"✅ *{customer.name}* has no pending balance — nothing to remind."
+        if not customer.phone:
+            return (
+                f"⚠️ *{customer.name}* has ₹{pending:,.2f} pending but no phone saved, "
+                "so I can't send a WhatsApp reminder. Update the customer's phone in the app."
+            )
+
+        message = (
+            f"🙏 Hello *{customer.name}*!\n\n"
+            f"A friendly reminder from {self.store_name}: you have a pending balance of "
+            f"*₹{pending:,.2f}*. Please settle at your earliest convenience.\n\n"
+            "Thank you! 🙏\n_Powered by KadaiGPT_"
+        )
+        result = await self.send_message(customer.phone, message)
+        if result.get("success"):
+            return f"✅ Reminder sent to *{customer.name}* (₹{pending:,.2f} pending)."
+        return (
+            f"⚠️ Reminder prepared for *{customer.name}* (₹{pending:,.2f} pending), "
+            "but sending failed right now. Check the WhatsApp connection in the app."
+        )
+
     async def _handle_reminder_step(self, phone: str, message: str, state: dict) -> str:
         """Handle reminder steps"""
         if message.lower() in ['confirm', 'yes']:
@@ -1119,14 +1332,28 @@ Reply *confirm* to send reminder."""
         else:
             del self._conversation_states[phone]
             return "Reminder cancelled."
-    
-    async def _get_pending_payments(self, user_id: Optional[int]) -> str:
-        """Get pending payments"""
-        return """💰 *Pending Payments*
 
-No pending payments found.
+    async def _get_pending_payments(self, store_id: Optional[int]) -> str:
+        """Get pending payments from real customer credit data."""
+        from app.database import async_session_maker
+        from app.services.bot_data import get_pending_payments
 
-_Add credit sales to track pending payments._"""
+        try:
+            async with async_session_maker() as db:
+                pending = await get_pending_payments(db, store_id)
+        except Exception as e:
+            logger.error(f"[WA] pending payments failed: {e}")
+            return "⚠️ Couldn't fetch pending payments right now. Please try again."
+
+        if not pending:
+            return (
+                "💰 *Pending Payments*\n\n"
+                "No pending payments found.\n\n"
+                "_Add credit sales to track pending payments._"
+            )
+        total = sum(p["amount"] for p in pending)
+        lines = "\n".join(f"• *{p['name']}* — ₹{p['amount']:,.2f}" for p in pending)
+        return f"💰 *Pending Payments*\n\nTotal outstanding: *₹{total:,.2f}*\n\n{lines}"
     
     # ==================== ORDERS MENU ====================
     
@@ -1142,27 +1369,111 @@ _Example: neworder_"""
     
     # ==================== PRICE CHECK ====================
     
-    async def _get_product_price(self, product: str) -> str:
-        """Get product price"""
-        # TODO: Fetch from database
-        return f"""💰 *Price Check*
+    async def _get_product_price(self, store_id: Optional[int], product: str) -> str:
+        """Get product price from the store's inventory."""
+        from app.database import async_session_maker
+        from app.models import Product
 
-Product: *{product}*
-Price: Not found
+        try:
+            async with async_session_maker() as db:
+                result = await db.execute(
+                    select(Product).where(
+                        Product.store_id == store_id,
+                        Product.is_active == True,  # noqa: E712
+                        Product.name.ilike(f"%{product.strip()}%"),
+                    ).limit(5)
+                )
+                products = result.scalars().all()
+        except Exception as e:
+            logger.error(f"[WA] price check failed: {e}")
+            return "⚠️ Couldn't check prices right now. Please try again."
 
-_Add the product first or check spelling._"""
-    
+        if not products:
+            return (
+                f"💰 *Price Check*\n\nProduct: *{product}*\nPrice: Not found\n\n"
+                "_Add the product first or check spelling._"
+            )
+        if len(products) > 1:
+            lines = "\n".join(
+                f"• *{p.name}* — ₹{p.selling_price:g}{' (out of stock)' if not p.current_stock else ''}"
+                for p in products[:5]
+            )
+            return f"💰 *Price Check — {len(products)} matches*\n\n{lines}"
+        p = products[0]
+        stock = (
+            f"✅ {p.current_stock} {p.unit or 'pcs'} in stock"
+            if (p.current_stock or 0) > 0
+            else "❌ Out of stock"
+        )
+        return f"💰 *Price Check*\n\nProduct: *{p.name}*\nPrice: ₹{p.selling_price:g}\n{stock}"
+
     # ==================== SEND BILL ====================
-    
-    async def _send_bill_to_customer(self, phone: str, bill_id: str) -> str:
-        """Send bill to customer via WhatsApp"""
-        # TODO: Fetch bill from database and send
-        return f"""📤 *Bill #{bill_id}*
 
-Bill copied to clipboard!
-Share link: https://kadaigpt.com/bill/{bill_id}
+    async def _send_bill_to_customer(self, store_id: Optional[int], phone: str, bill_id: str) -> str:
+        """Fetch a bill from the DB and send it to the customer's WhatsApp."""
+        from sqlalchemy import or_
+        from app.database import async_session_maker
+        from app.models import Bill, BillItem, Store
 
-_Bill will be sent to customer's WhatsApp._"""
+        try:
+            async with async_session_maker() as db:
+                cond = Bill.bill_number == bill_id
+                if bill_id.isdigit():
+                    cond = or_(cond, Bill.id == int(bill_id))
+                bill = (
+                    await db.execute(
+                        select(Bill).where(Bill.store_id == store_id, cond)
+                    )
+                ).scalars().first()
+
+                if not bill:
+                    return (
+                        f"⚠️ Bill *{bill_id}* not found in your store.\n"
+                        "Type *bills* to see recent bills."
+                    )
+                if not bill.customer_phone:
+                    return (
+                        f"⚠️ Bill *{bill.bill_number}* has no customer phone saved, "
+                        "so I can't send it on WhatsApp."
+                    )
+
+                store = (
+                    await db.execute(select(Store).where(Store.id == store_id))
+                ).scalar_one_or_none()
+                items = (
+                    await db.execute(
+                        select(BillItem).where(BillItem.bill_id == bill.id)
+                    )
+                ).scalars().all()
+
+                store_name = store.name if store else "KadaiGPT Store"
+                lines = [f"🧾 *{store_name}*", f"Bill: {bill.bill_number}", ""]
+                for it in items[:20]:
+                    lines.append(f"• {it.product_name} x{it.quantity:g} — ₹{it.total:g}")
+                lines += [
+                    "",
+                    f"*Total: ₹{bill.total_amount:,.2f}*",
+                    f"Payment: {bill.payment_method.value if bill.payment_method else 'CASH'}",
+                    "",
+                    "Thank you for shopping with us! 🙏",
+                    "_Powered by KadaiGPT_",
+                ]
+                wa_msg = "\n".join(lines)
+                customer_phone = bill.customer_phone
+                bill_number = bill.bill_number
+                bill_total = bill.total_amount
+                customer_name = bill.customer_name or "customer"
+        except Exception as e:
+            logger.error(f"[WA] send bill failed: {e}")
+            return "⚠️ Couldn't fetch that bill right now. Please try again."
+
+        result = await self.send_message(customer_phone, wa_msg)
+        if result.get("success"):
+            return f"✅ Bill *{bill_number}* (₹{bill_total:,.2f}) sent to {customer_name}."
+        return (
+            f"⚠️ Bill *{bill_number}* fetched, but sending failed right now. "
+            "Check the WhatsApp connection in the app."
+        )
     
     # ==================== RESPONSE GENERATORS ====================
     
@@ -1235,149 +1546,234 @@ Try:
 
 Or say *hi* to get started! 👋"""
 
-    async def _get_sales_response(self, user_id: Optional[int]) -> str:
-        """Get sales data from real database"""
+    async def _get_sales_response(self, store_id: Optional[int], period: str = 'today') -> str:
+        """Get today's sales from the store's real data."""
         today = datetime.now().strftime("%d %b %Y")
-        
+        from app.database import async_session_maker
+        from app.services.bot_data import get_sales_summary
+
         try:
-            # Try to get data from internal API
-            async with httpx.AsyncClient() as client:
-                # Call our own analytics endpoint
-                base_url = settings.API_BASE_URL or "http://localhost:8000"
-                response = await client.get(
-                    f"{base_url}/api/v1/bills/analytics/today",
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    today_data = data.get("today", {})
-                    payment_breakdown = data.get("payment_breakdown", {})
-                    
-                    total_sales = today_data.get("revenue", 0)
-                    total_bills = today_data.get("bills", 0)
-                    avg_bill = today_data.get("avg_bill_value", 0)
-                    
-                    cash = payment_breakdown.get("cash", 0)
-                    upi = payment_breakdown.get("upi", 0)
-                    card = payment_breakdown.get("card", 0)
-                    credit = payment_breakdown.get("credit", 0)
-                    
-                    change_pct = data.get("revenue_change_percent", 0)
-                    trend = "📈" if change_pct >= 0 else "📉"
-                    
-                    return f"""📊 *Sales Report*
+            async with async_session_maker() as db:
+                data = await get_sales_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[WA] sales report failed: {e}")
+            return (
+                f"📊 *Sales Report*\n📅 {today}\n\n"
+                "⚠️ Unable to fetch live data right now. Please try again.\n\n"
+                "Type *help* for other commands."
+            )
+
+        breakdown = data["payment_breakdown"]
+        pay_lines = "\n".join(
+            f"• {m.title()}: ₹{v:,.0f}" for m, v in breakdown.items()
+        ) or "• No sales yet"
+        trend = "📈" if data["change_percent"] >= 0 else "📉"
+        return f"""📊 *Sales Report*
 📅 {today}
 
-💰 *Today's Sales*: ₹{total_sales:,.0f}
-🧾 *Bills Created*: {total_bills}
-📈 *Avg Bill Value*: ₹{avg_bill:,.0f}
-{trend} *vs Yesterday*: {change_pct:+.1f}%
+💰 *Today's Sales*: ₹{data['revenue']:,.0f}
+🧾 *Bills Created*: {data['bills']}
+📈 *Avg Bill Value*: ₹{data['avg_bill']:,.0f}
+{trend} *vs Yesterday*: {data['change_percent']:+.1f}%
 
 💳 *Payment Breakdown*
-• Cash: ₹{cash:,.0f}
-• UPI: ₹{upi:,.0f}
-• Card: ₹{card:,.0f}
-• Credit: ₹{credit:,.0f}
+{pay_lines}
 
 _Updated just now_ ✨
 Type *report* for full summary."""
 
-        except Exception as e:
-            logger.error(f"Failed to fetch sales data: {e}")
-        
-        # Fallback response
-        return f"""📊 *Sales Report*
-📅 {today}
-
-Unable to fetch live data. Please check the app!
-
-Type *help* for other commands."""
-
-    async def _get_expense_response(self, user_id: Optional[int]) -> str:
+    async def _get_expense_response(self, store_id: Optional[int]) -> str:
         today = datetime.now().strftime("%d %b %Y")
-        
+        from app.database import async_session_maker
+        from app.services.bot_data import get_expense_summary
+
+        try:
+            async with async_session_maker() as db:
+                data = await get_expense_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[WA] expense report failed: {e}")
+            return (
+                f"💸 *Expense Report*\n📅 {today}\n\n"
+                "⚠️ Unable to fetch expenses right now. Please try again."
+            )
+
+        cat_lines = "\n".join(
+            f"• {k.title()}: ₹{v:,.0f}" for k, v in data["by_category"].items()
+        ) or "• No expenses yet"
         return f"""💸 *Expense Report*
 📅 {today}
 
-📉 *Total Expenses*: ₹0
-📝 *Transactions*: 0
+📉 *Total Expenses*: ₹{data['total']:,.0f}
+📝 *Transactions*: {data['count']}
 
 *By Category*
-• Inventory: ₹0
-• Utilities: ₹0
-• Salary: ₹0
-• Other: ₹0
+{cat_lines}
 
 _Updated just now_"""
 
-    async def _get_profit_response(self, user_id: Optional[int]) -> str:
+    async def _get_profit_response(self, store_id: Optional[int]) -> str:
         today = datetime.now().strftime("%d %b %Y")
-        
+        from app.database import async_session_maker
+        from app.services.bot_data import get_sales_summary, get_expense_summary
+
+        try:
+            async with async_session_maker() as db:
+                sales = await get_sales_summary(db, store_id)
+                expenses = await get_expense_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[WA] profit report failed: {e}")
+            return (
+                f"💹 *Profit & Loss*\n📅 {today}\n\n"
+                "⚠️ Unable to fetch profit data right now. Please try again."
+            )
+
+        net = sales["revenue"] - expenses["total"]
         return f"""💹 *Profit & Loss*
 📅 {today}
 
-📈 *Income*: ₹0
-📉 *Expenses*: ₹0
+📈 *Income*: ₹{sales['revenue']:,.0f}
+📉 *Expenses*: ₹{expenses['total']:,.0f}
 ━━━━━━━━━━━━━
-✅ *Net Profit*: ₹0
+✅ *Net Profit*: ₹{net:,.0f}
 
 _Updated just now_"""
 
-    async def _get_stock_response(self, user_id: Optional[int]) -> str:
-        return """📦 *Stock Status*
+    async def _get_stock_response(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_stock_summary
 
-⚠️ *Low Stock Items*: 0
-❌ *Out of Stock*: 0
+        try:
+            async with async_session_maker() as db:
+                data = await get_stock_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[WA] stock report failed: {e}")
+            return "⚠️ Unable to fetch stock right now. Please try again."
 
-✅ All items are well stocked!
+        if not data["low_items"]:
+            return (
+                "📦 *Stock Status*\n\n"
+                f"✅ {data['total']} products, all well stocked!\n\n"
+                "Type *products* for full inventory."
+            )
+        lines = "\n".join(
+            f"• *{it['name']}* — {it['stock']} left (min {it['min']})"
+            for it in data["low_items"]
+        )
+        return f"""📦 *Stock Status*
+
+⚠️ *Low Stock Items*: {data['low']}
+❌ *Out of Stock*: {data['out']}
+
+{lines}
 
 Type *products* for full inventory."""
 
-    async def _get_bills_response(self, user_id: Optional[int]) -> str:
+    async def _get_bills_response(self, store_id: Optional[int]) -> str:
         today = datetime.now().strftime("%d %b %Y")
-        
-        return f"""🧾 *Recent Bills*
-📅 {today}
+        from app.database import async_session_maker
+        from app.services.bot_data import get_recent_bills
 
-No bills found.
+        try:
+            async with async_session_maker() as db:
+                bills = await get_recent_bills(db, store_id, limit=5)
+        except Exception as e:
+            logger.error(f"[WA] bills report failed: {e}")
+            return (
+                f"🧾 *Recent Bills*\n📅 {today}\n\n"
+                "⚠️ Unable to fetch bills right now. Please try again."
+            )
 
-Create a bill: Type *newbill*"""
+        if not bills:
+            return (
+                f"🧾 *Recent Bills*\n📅 {today}\n\nNo bills found.\n\n"
+                "Create a bill: Type *newbill*"
+            )
+        lines = "\n".join(
+            f"• *{b['bill_number']}* — ₹{b['total']:,.0f} ({b['customer']})"
+            for b in bills
+        )
+        return f"🧾 *Recent Bills*\n📅 {today}\n\n{lines}\n\nCreate a bill: Type *newbill*"
 
-    async def _get_customers_response(self, user_id: Optional[int]) -> str:
-        return """👥 *Customers*
+    async def _get_customers_response(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_customers_summary
 
-📊 *Total*: 0
-🆕 *New This Month*: 0
-💰 *With Balance*: 0
+        try:
+            async with async_session_maker() as db:
+                data = await get_customers_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[WA] customers report failed: {e}")
+            return "⚠️ Unable to fetch customers right now. Please try again."
+
+        return f"""👥 *Customers*
+
+📊 *Total*: {data['total']}
+🆕 *New This Month*: {data['new_this_month']}
+💰 *With Balance*: {data['with_balance']}
 
 Add customers from the KadaiGPT app."""
 
-    async def _get_products_response(self, user_id: Optional[int]) -> str:
-        return """📦 *Products*
+    async def _get_products_response(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_stock_summary
 
-📊 *Total Products*: 0
-✅ *In Stock*: 0
-⚠️ *Low Stock*: 0
-❌ *Out of Stock*: 0
+        try:
+            async with async_session_maker() as db:
+                data = await get_stock_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[WA] products report failed: {e}")
+            return "⚠️ Unable to fetch products right now. Please try again."
+
+        return f"""📦 *Products*
+
+📊 *Total Products*: {data['total']}
+✅ *In Stock*: {data['in_stock']}
+⚠️ *Low Stock*: {data['low']}
+❌ *Out of Stock*: {data['out']}
 
 Add products: Type *add [product name]*"""
 
-    async def _get_gst_response(self, user_id: Optional[int]) -> str:
-        return """📋 *GST Summary*
+    async def _get_gst_response(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_gst_summary
 
-💰 *Taxable Sales*: ₹0
-📊 *CGST*: ₹0
-📊 *SGST*: ₹0
+        try:
+            async with async_session_maker() as db:
+                data = await get_gst_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[WA] gst report failed: {e}")
+            return "⚠️ Unable to fetch GST data right now. Please try again."
+
+        cgst = data["tax"] / 2
+        sgst = data["tax"] / 2
+        return f"""📋 *GST Summary*
+📅 {data['period']}
+
+💰 *Taxable Sales*: ₹{data['taxable']:,.0f}
+📊 *CGST*: ₹{cgst:,.0f}
+📊 *SGST*: ₹{sgst:,.0f}
 ━━━━━━━━━━━━━
-💵 *Total GST Collected*: ₹0
+💵 *Total GST Collected*: ₹{data['tax']:,.0f}
 
 _For the current month_"""
 
-    async def _get_daily_report(self, user_id: Optional[int]) -> str:
+    async def _get_daily_report(self, store_id: Optional[int]) -> str:
         today = datetime.now().strftime("%A, %d %B %Y")
         time_now = datetime.now().strftime("%I:%M %p")
-        
+        from app.database import async_session_maker
+        from app.services.bot_data import get_daily_report
+
+        try:
+            async with async_session_maker() as db:
+                d = await get_daily_report(db, store_id)
+        except Exception as e:
+            logger.error(f"[WA] daily report failed: {e}")
+            return (
+                f"📊 *DAILY BUSINESS REPORT*\n📅 {today}\n\n"
+                "⚠️ Unable to fetch the report right now. Please try again."
+            )
+
+        sales = d["sales"]
         return f"""📊 *DAILY BUSINESS REPORT*
 📅 {today}
 🕐 Generated at {time_now}
@@ -1385,23 +1781,23 @@ _For the current month_"""
 ━━━━━━━━━━━━━━━━━━━
 
 💰 *SALES*
-• Revenue: ₹0
-• Bills: 0
-• Avg Bill: ₹0
+• Revenue: ₹{sales['revenue']:,.0f}
+• Bills: {sales['bills']}
+• Avg Bill: ₹{sales['avg_bill']:,.0f}
 
 💸 *EXPENSES*
-• Total: ₹0
+• Total: ₹{d['expenses']['total']:,.0f}
 
 💹 *PROFIT*
-• Net: ₹0
+• Net: ₹{d['profit']:,.0f}
 
 📦 *INVENTORY*
-• Low Stock: 0
-• Out of Stock: 0
+• Low Stock: {d['stock']['low']}
+• Out of Stock: {d['stock']['out']}
 
 👥 *CUSTOMERS*
-• Total: 0
-• Pending: ₹0
+• Total: {d['customers']['total']}
+• Pending: ₹{d['pending_total']:,.0f}
 
 ━━━━━━━━━━━━━━━━━━━
 

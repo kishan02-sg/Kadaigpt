@@ -23,6 +23,10 @@ export default function OfflineIndicator() {
             setPendingCount(offlineSync.getPendingCount())
         }, 5000)
 
+        // Refresh immediately when something is queued/synced (no 5s wait)
+        const refreshCount = () => setPendingCount(offlineSync.getPendingCount())
+        window.addEventListener('kadaigpt:offline-queue-changed', refreshCount)
+
         // Show banner if offline on mount
         if (!navigator.onLine) setShowBanner(true)
         setPendingCount(offlineSync.getPendingCount())
@@ -30,6 +34,7 @@ export default function OfflineIndicator() {
         return () => {
             unsubscribe()
             clearInterval(interval)
+            window.removeEventListener('kadaigpt:offline-queue-changed', refreshCount)
         }
     }, [])
 

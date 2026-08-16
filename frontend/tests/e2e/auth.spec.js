@@ -1,63 +1,62 @@
 /**
  * KadaiGPT E2E Tests — Critical Flow: Authentication
- * Tests login, demo mode, logout, and session persistence
+ * Covers the unauthenticated login page, invalid credentials, registration
+ * mode, dashboard landing for an authenticated owner, and logout.
+ *
+ * Authenticated tests use the shared owner account from global-setup.js
+ * (storageState); unauthenticated tests override with an empty storage state.
  */
 
 import { test, expect } from '@playwright/test'
 
 test.describe('Authentication Flow', () => {
 
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/')
+    test.describe('unauthenticated', () => {
+        test.use({ storageState: { cookies: [], origins: [] } })
+
+        test.beforeEach(async ({ page }) => {
+            await page.goto('/')
+        })
+
+        test('should show login page when not authenticated', async ({ page }) => {
+            await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible()
+            await expect(page.locator('#email')).toBeVisible()
+            await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible()
+        })
+
+        test('should show error for invalid credentials', async ({ page }) => {
+            await page.fill('#email', 'invalid@test.com')
+            await page.fill('#password', 'wrongpassword')
+            await page.getByRole('button', { name: /sign in/i }).click()
+            await expect(page.locator('.error-alert')).toBeVisible({ timeout: 10000 })
+        })
+
+        test('should switch to registration mode', async ({ page }) => {
+            await page.getByRole('button', { name: /sign up free/i }).click()
+            await expect(page.locator('#fullname')).toBeVisible()
+            await expect(page.locator('#storename')).toBeVisible()
+            await expect(page.getByRole('button', { name: /create account/i })).toBeVisible()
+        })
     })
 
-    test('should show login page when not authenticated', async ({ page }) => {
-        // Login form should be visible
-        await expect(page.locator('text=Login')).toBeVisible()
-    })
+    test.describe('authenticated (shared e2e account)', () => {
 
-    test('should login with demo mode', async ({ page }) => {
-        // Click demo mode button
-        const demoButton = page.locator('text=Demo Mode').or(page.locator('text=Try Demo'))
-        if (await demoButton.isVisible()) {
-            await demoButton.first().click()
-            // Should navigate to dashboard
-            await expect(page.locator('text=Dashboard').first()).toBeVisible({ timeout: 10000 })
-        }
-    })
+        test('should land on dashboard when authenticated', async ({ page }) => {
+            await page.goto('/')
+            await expect(page.getByText("Today's Sales").first()).toBeVisible({ timeout: 15000 })
+        })
 
-    test('should show error for invalid credentials', async ({ page }) => {
-        // Fill in invalid credentials
-        const emailInput = page.locator('input[type="email"], input[placeholder*="email" i]')
-        const passwordInput = page.locator('input[type="password"]')
+        test('should logout successfully', async ({ page }) => {
+            await page.goto('/')
+            await expect(page.getByText("Today's Sales").first()).toBeVisible({ timeout: 15000 })
 
-        if (await emailInput.isVisible()) {
-            await emailInput.fill('invalid@test.com')
-            await passwordInput.fill('wrongpassword')
+            await page.locator('.user-btn').click()
+            await page.locator('.logout-btn').click()
 
-            // Submit the form
-            const submitBtn = page.locator('button[type="submit"]').or(page.locator('text=Login').locator('button'))
-            await submitBtn.first().click()
-
-            // Should show error toast or message
-            await page.waitForTimeout(2000)
-        }
-    })
-
-    test('should logout successfully', async ({ page }) => {
-        // First login with demo mode
-        const demoButton = page.locator('text=Demo Mode').or(page.locator('text=Try Demo'))
-        if (await demoButton.isVisible()) {
-            await demoButton.first().click()
-            await page.waitForTimeout(3000)
-
-            // Look for logout button or user menu
-            const logoutBtn = page.locator('text=Logout').or(page.locator('[title="Logout"]'))
-            if (await logoutBtn.isVisible()) {
-                await logoutBtn.first().click()
-                // Should return to login page
-                await expect(page.locator('text=Login').first()).toBeVisible({ timeout: 5000 })
-            }
-        }
+            // Back on the login page, and the token is gone from this context.
+            await expect(page.getByRole('heading', { name: /welcome back/i })).toBeVisible({ timeout: 10000 })
+            const token = await page.evaluate(() => localStorage.getItem('kadai_token'))
+            expect(token).toBeNull()
+        })
     })
 })

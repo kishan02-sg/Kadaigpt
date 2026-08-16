@@ -1046,7 +1046,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1100;
+    /* Must stay above the fixed mobile nav (z-index 1100) or its bottom
+       content is unclickable on phones. Keep in sync with index.css. */
+    z-index: var(--z-modal);
     padding: 20px;
     animation: fadeIn 0.2s ease;
 }
@@ -1393,7 +1395,10 @@
     font-weight: 500;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
     animation: slideUp 0.3s ease;
-    pointer-events: auto;
+    /* Toasts are informational — never let them block clicks on the UI
+       behind them (stacked toasts previously covered buttons and made
+       them unclickable while visible). */
+    pointer-events: none;
 }
 
 .toast-success {

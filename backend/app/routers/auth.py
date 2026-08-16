@@ -600,6 +600,57 @@ async def get_current_user_profile(
     }
 
 
+class ProfileUpdate(BaseModel):
+    """Editable profile fields (phone is what the WhatsApp bot matches on)."""
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+
+
+@router.put("/me", response_model=dict)
+async def update_current_user_profile(
+    payload: ProfileUpdate,
+    token: str = Depends(oauth2_scheme),
+    current_user=Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update the current user's profile (full_name / phone)."""
+    from sqlalchemy import text
+
+    result = await db.execute(text("SELECT id, phone FROM users WHERE id = :uid"), {"uid": current_user.id})
+    row = result.mappings().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    updates = {}
+    if payload.full_name is not None:
+        name = payload.full_name.strip()
+        if len(name) < 2:
+            raise HTTPException(status_code=400, detail="Name must be at least 2 characters")
+        updates["full_name"] = name
+
+    if payload.phone is not None:
+        phone = payload.phone.strip() or None
+        if phone:
+            existing = await db.execute(
+                text("SELECT id FROM users WHERE phone = :p AND id != :uid"),
+                {"p": phone, "uid": current_user.id},
+            )
+            if existing.mappings().first():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Phone number already registered to another user",
+                )
+        updates["phone"] = phone
+
+    if not updates:
+        return await get_current_user_profile(token=token, db=db)
+
+    sets = ", ".join(f"{k} = :{k}" for k in updates)
+    await db.execute(text(f"UPDATE users SET {sets} WHERE id = :uid"), {**updates, "uid": current_user.id})
+    await db.commit()
+    return await get_current_user_profile(token=token, db=db)
+
+
 # ═══════════════════════════════════════════
 # STAFF LOGIN & MANAGEMENT ENDPOINTS
 # ═══════════════════════════════════════════

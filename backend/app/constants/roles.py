@@ -50,6 +50,9 @@ class BillStatus(str, enum.Enum):
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
     REFUNDED = "REFUNDED"
+    # Bill created, UPI QR shown at checkout, money not confirmed yet.
+    # Only the Razorpay webhook transitions this to COMPLETED.
+    PENDING_PAYMENT = "PENDING_PAYMENT"
 
     @classmethod
     def _missing_(cls, value):

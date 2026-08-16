@@ -105,86 +105,203 @@ Type /help anytime for assistance."""
             logger.error(f"Error processing message: {e}")
             return "Sorry, something went wrong. Please try again or type /help."
     
+    async def _resolve_ctx(self, chat_id: str) -> Optional[Dict[str, Any]]:
+        """Resolve the registered owner for a Telegram chat via telegram_chat_id.
+
+        Returns {"user_id", "store_id"} or None when the chat isn't linked to a
+        KadaiGPT account.
+        """
+        from sqlalchemy import select
+        from app.database import async_session_maker
+        from app.models import User
+
+        try:
+            async with async_session_maker() as db:
+                result = await db.execute(
+                    select(User).where(
+                        User.telegram_chat_id == chat_id,
+                        User.is_active == True,  # noqa: E712
+                    )
+                )
+                user = result.scalar_one_or_none()
+                if not user or not user.store_id:
+                    return None
+                return {"user_id": user.id, "store_id": user.store_id}
+        except Exception as e:
+            logger.error(f"[TG] user resolution failed for {chat_id}: {e}")
+            return None
+
+    def _link_required_message(self) -> str:
+        return (
+            "🔗 *Your Telegram isn't linked to a KadaiGPT account yet.*\n\n"
+            "1. Send */link* here to get a one-time code\n"
+            "2. Open the KadaiGPT app → *Settings → Telegram*\n"
+            "3. Enter the code\n\n"
+            "Then I'll show your store's live data."
+        )
+
+    async def _handle_link(self, chat_id: str) -> str:
+        """Generate a one-time linking code the user enters in the KadaiGPT app."""
+        import secrets
+        from datetime import datetime, timedelta
+        from app.database import async_session_maker
+        from app.models import AuthSecurityState
+
+        code = secrets.token_hex(4).upper()  # 8 chars
+        try:
+            async with async_session_maker() as db:
+                db.add(AuthSecurityState(
+                    kind="telegram_link",
+                    key=code,
+                    data={"chat_id": chat_id},
+                    expires_at=datetime.utcnow() + timedelta(minutes=30),
+                ))
+                await db.commit()
+        except Exception as e:
+            logger.error(f"[TG] link code generation failed: {e}")
+            return "⚠️ Couldn't generate a link code right now. Please try again."
+
+        return (
+            f"🔗 *Link your KadaiGPT account*\n\n"
+            f"Your one-time code: *{code}*\n\n"
+            "Open the KadaiGPT app → *Settings → Telegram* and enter this code "
+            "within 30 minutes.\n\n"
+            "Once linked, I'll show your store's live data here."
+        )
+
     async def _handle_command(self, chat_id: str, command: str, user_name: str) -> str:
         """Handle bot commands"""
-        
-        if command in ['/start', '/help']:
+
+        # /start, /help and /link work before linking; everything else needs an
+        # account so reports and writes are store-scoped.
+        if command == '/start':
+            return await self._get_start_message(chat_id, user_name)
+        elif command == '/help':
             return self._get_help_message()
-        
-        elif command == '/sales':
-            return await self._get_sales_report()
-        
+        elif command == '/link':
+            return await self._handle_link(chat_id)
+
+        ctx = await self._resolve_ctx(chat_id)
+        store_id = ctx.get("store_id") if ctx else None
+        user_id = ctx.get("user_id") if ctx else None
+
+        if not ctx:
+            return self._link_required_message()
+
+        if command == '/sales':
+            return await self._get_sales_report(store_id)
+
         elif command == '/stock':
-            return await self._get_stock_report()
-        
+            return await self._get_stock_report(store_id)
+
         elif command == '/lowstock':
-            return await self._get_low_stock_alerts()
-        
+            return await self._get_low_stock_alerts(store_id)
+
         elif command == '/expense':
-            return await self._get_expense_report()
-        
+            return await self._get_expense_report(store_id)
+
         elif command == '/profit':
-            return await self._get_profit_report()
-        
+            return await self._get_profit_report(store_id)
+
         elif command == '/report':
-            return await self._get_full_report()
-        
+            return await self._get_full_report(store_id)
+
         elif command == '/bill':
-            self._conversation_states[chat_id] = {'action': 'create_bill', 'step': 'customer'}
+            if not ctx:
+                return self._link_required_message()
+            self._conversation_states[chat_id] = {
+                'action': 'create_bill', 'step': 'customer',
+                'user_id': user_id, 'store_id': store_id,
+            }
             return "🧾 *Create New Bill*\n\nPlease enter customer name (or 'walk-in'):"
-        
+
         elif command == '/addproduct':
-            self._conversation_states[chat_id] = {'action': 'add_product', 'step': 'name'}
+            if not ctx:
+                return self._link_required_message()
+            self._conversation_states[chat_id] = {
+                'action': 'add_product', 'step': 'name',
+                'user_id': user_id, 'store_id': store_id,
+            }
             return "📦 *Add New Product*\n\nPlease enter product name:"
-        
+
         elif command == '/predict':
             return await self._get_predictions()
-        
+
         elif command == '/suggest':
             return await self._get_suggestions()
-        
+
         elif command == '/bills':
-            return await self._get_recent_bills()
-        
+            return await self._get_recent_bills(store_id)
+
         elif command == '/pending':
-            return await self._get_pending_payments()
-        
+            return await self._get_pending_payments(store_id)
+
         elif command == '/cancel':
             if chat_id in self._conversation_states:
                 del self._conversation_states[chat_id]
             return "❌ Action cancelled. How can I help you?"
-        
+
         else:
             return f"Unknown command: {command}\n\nType /help to see available commands."
+
+    async def _get_start_message(self, chat_id: str, user_name: str) -> str:
+        """Welcome message: full store access when linked, link prompt otherwise."""
+        ctx = await self._resolve_ctx(chat_id)
+        if not ctx:
+            return (
+                f"🎉 *Vanakkam {user_name}!* 🙏\n\n"
+                "I'm your KadaiGPT AI assistant for your retail store.\n\n"
+                "To get started, link your account:\n"
+                "1. Send */link* here to get a one-time code\n"
+                "2. Open the KadaiGPT app → *Settings → Telegram*\n"
+                "3. Enter the code\n\n"
+                "Type /help anytime."
+            )
+        return (
+            f"🎉 *Vanakkam {user_name}!* 🙏\n\n"
+            "I'm your KadaiGPT AI assistant. Your account is linked — "
+            "I can see your store's live data.\n\n"
+            "*Quick Commands:*\n"
+            "📊 /sales • /expense • /profit • /report\n"
+            "📦 /stock • /lowstock • /addproduct\n"
+            "🧾 /bill • /bills • /pending\n\n"
+            "Type /help for everything."
+        )
     
     async def _handle_natural_language(self, chat_id: str, text: str) -> str:
-        """Handle natural language queries"""
+        """Handle natural language queries (store-scoped once linked)"""
+        ctx = await self._resolve_ctx(chat_id)
+        store_id = ctx.get("store_id") if ctx else None
+
+        if not ctx:
+            return self._link_required_message()
+
         text_lower = text.lower()
-        
+
         # Sales queries
         if any(word in text_lower for word in ['sales', 'sell', 'sold', 'revenue', 'விற்பனை']):
-            return await self._get_sales_report()
-        
+            return await self._get_sales_report(store_id)
+
         # Stock queries
         elif any(word in text_lower for word in ['stock', 'inventory', 'available', 'சரக்கு']):
-            return await self._get_stock_report()
-        
+            return await self._get_stock_report(store_id)
+
         # Expense queries
         elif any(word in text_lower for word in ['expense', 'cost', 'spending', 'செலவு']):
-            return await self._get_expense_report()
-        
+            return await self._get_expense_report(store_id)
+
         # Profit queries
         elif any(word in text_lower for word in ['profit', 'margin', 'earning', 'லாபம்']):
-            return await self._get_profit_report()
-        
+            return await self._get_profit_report(store_id)
+
         # Bill queries
         elif any(word in text_lower for word in ['bill', 'invoice', 'receipt', 'பில்']):
-            return await self._get_recent_bills()
-        
+            return await self._get_recent_bills(store_id)
+
         # Greetings
         elif any(word in text_lower for word in ['hi', 'hello', 'hey', 'vanakkam', 'வணக்கம்', 'namaste']):
             return "🙏 Vanakkam! How can I help you today?\n\nType /help to see what I can do!"
-        
+
         # Default response
         else:
             return self._get_default_response()
@@ -221,22 +338,43 @@ Type /help anytime for assistance."""
             if text.lower() == 'done':
                 if not state.get('items'):
                     return "⚠️ No items added yet! Add at least one item or type /cancel"
-                
-                # Generate bill summary
+
+                store_id = state.get('store_id')
+                user_id = state.get('user_id')
+                customer = state.get('customer') or "Walk-in"
                 items = state.get('items', [])
                 total = sum(item['total'] for item in items)
-                
-                bill_text = f"🧾 *BILL SUMMARY*\n\n"
-                bill_text += f"Customer: {state.get('customer')}\n"
+                del self._conversation_states[chat_id]
+
+                if not store_id:
+                    return self._link_required_message()
+
+                from app.database import async_session_maker
+                from app.services.bot_actions import create_bill_for_bot
+
+                try:
+                    async with async_session_maker() as db:
+                        ok, detail, _bill = await create_bill_for_bot(
+                            db, store_id, user_id,
+                            [{"name": it["name"], "qty": it["qty"], "price": it["price"]} for it in items],
+                            customer_name=customer, source="telegram",
+                        )
+                    if not ok:
+                        return detail
+                except Exception as e:
+                    logger.error(f"[TG] create bill failed: {e}")
+                    return "⚠️ Could not create the bill right now. Please try again."
+
+                bill_text = f"🧾 *BILL CREATED* ✅\n\n"
+                bill_text += f"Bill No: {detail}\n"
+                bill_text += f"Customer: {customer}\n"
                 bill_text += f"Items: {len(items)}\n\n"
-                
+
                 for i, item in enumerate(items, 1):
                     bill_text += f"{i}. {item['name']} x{item['qty']} = ₹{item['total']}\n"
-                
+
                 bill_text += f"\n*Total: ₹{total}*\n\n"
-                bill_text += "Bill created successfully! ✅"
-                
-                del self._conversation_states[chat_id]
+                bill_text += "Type /bills to see recent bills."
                 return bill_text
             
             # Parse item
@@ -286,23 +424,44 @@ Type /help anytime for assistance."""
         elif step == 'stock':
             try:
                 stock = int(text)
-                
-                # Product summary
-                product_text = f"✅ *Product Added!*\n\n"
-                product_text += f"📦 Name: {state.get('name')}\n"
-                product_text += f"💰 Price: ₹{state.get('price')}\n"
-                product_text += f"📊 Stock: {stock} units\n"
-                
-                del self._conversation_states[chat_id]
-                return product_text
-            except:
+            except (ValueError, TypeError):
                 return "⚠️ Please enter a valid stock number."
+
+            store_id = state.get('store_id')
+            user_id = state.get('user_id')
+            name = state.get('name', '').strip()
+            price = state.get('price')
+            del self._conversation_states[chat_id]
+
+            if not store_id:
+                return self._link_required_message()
+
+            from app.database import async_session_maker
+            from app.services.bot_actions import create_product_for_store
+
+            try:
+                async with async_session_maker() as db:
+                    ok, msg = await create_product_for_store(
+                        db, store_id, user_id, name, price, stock, source="telegram"
+                    )
+                if ok:
+                    return f"{msg}\n\nType /stock to see inventory."
+                return msg
+            except Exception as e:
+                logger.error(f"[TG] add product failed: {e}")
+                return "⚠️ Could not save the product right now. Please try again."
         
         return "Something went wrong. Type /cancel to start over."
     
     def _get_help_message(self) -> str:
         """Get help message"""
         return """🤖 *KadaiGPT Bot Commands*
+
+🔗 *Setup*
+/link - Link your KadaiGPT account
+/start - Welcome & status
+
+📊 *Reports*
 
 📊 *Reports*
 /sales - Today's sales report
@@ -347,107 +506,145 @@ Examples:
 • "Low stock items"
 • "Create a bill" """
     
-    # Report methods (placeholder - connect to real DB)
-    async def _get_sales_report(self) -> str:
-        return """📊 *Today's Sales Report*
+    # ==================== REPORT METHODS (real, store-scoped data) ====================
 
-💰 Total Sales: ₹12,450
-🧾 Bills: 28
-👥 Customers: 25
-📈 Avg Bill: ₹444
+    async def _get_sales_report(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_sales_summary
 
-*Top Products:*
-1. Rice 5kg - 15 units
-2. Sugar 1kg - 22 units
-3. Oil 1L - 18 units
+        try:
+            async with async_session_maker() as db:
+                data = await get_sales_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[TG] sales report failed: {e}")
+            return "⚠️ Unable to fetch sales data right now. Please try again."
 
-_Updated just now_"""
-    
-    async def _get_stock_report(self) -> str:
-        return """📦 *Stock Summary*
+        breakdown = data["payment_breakdown"]
+        pay_lines = "\n".join(
+            f"• {m.title()}: ₹{v:,.0f}" for m, v in breakdown.items()
+        ) or "• No sales yet"
+        trend = "📈" if data["change_percent"] >= 0 else "📉"
+        return (
+            "📊 *Today's Sales Report*\n\n"
+            f"💰 Total Sales: ₹{data['revenue']:,.0f}\n"
+            f"🧾 Bills: {data['bills']}\n"
+            f"📈 Avg Bill: ₹{data['avg_bill']:,.0f}\n"
+            f"{trend} vs Yesterday: {data['change_percent']:+.1f}%\n\n"
+            f"*Payment Breakdown:*\n{pay_lines}\n\n"
+            "_Updated just now_"
+        )
 
-✅ In Stock: 156 products
-⚠️ Low Stock: 8 products
-❌ Out of Stock: 3 products
+    async def _get_stock_report(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_stock_summary
 
-*Low Stock Items:*
-• Sugar 1kg - 5 left
-• Milk 500ml - 8 left
-• Bread - 3 left
+        try:
+            async with async_session_maker() as db:
+                data = await get_stock_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[TG] stock report failed: {e}")
+            return "⚠️ Unable to fetch stock right now. Please try again."
 
-Type /lowstock for full list."""
-    
-    async def _get_low_stock_alerts(self) -> str:
-        return """⚠️ *Low Stock Alerts*
+        return (
+            "📦 *Stock Summary*\n\n"
+            f"✅ In Stock: {data['in_stock']} products\n"
+            f"⚠️ Low Stock: {data['low']} products\n"
+            f"❌ Out of Stock: {data['out']} products\n\n"
+            "Type /lowstock for the list."
+        )
 
-These items need restocking:
+    async def _get_low_stock_alerts(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_stock_summary
 
-1. Sugar 1kg - 5 left (Min: 20)
-2. Milk 500ml - 8 left (Min: 30)
-3. Bread - 3 left (Min: 10)
-4. Eggs - 12 left (Min: 50)
-5. Butter 100g - 4 left (Min: 15)
+        try:
+            async with async_session_maker() as db:
+                data = await get_stock_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[TG] low stock failed: {e}")
+            return "⚠️ Unable to fetch stock right now. Please try again."
 
-💡 _Order soon to avoid stockouts!_"""
-    
-    async def _get_expense_report(self) -> str:
-        return """💸 *Today's Expenses*
+        if not data["low_items"]:
+            return f"✅ *Low Stock Alerts*\n\nNo items need restocking — {data['total']} products all well stocked!"
+        lines = "\n".join(
+            f"• {it['name']} - {it['stock']} left (Min: {it['min']})"
+            for it in data["low_items"]
+        )
+        return f"⚠️ *Low Stock Alerts*\n\nThese items need restocking:\n\n{lines}\n\n💡 _Order soon to avoid stockouts!_"
 
-Total: ₹3,200
+    async def _get_expense_report(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_expense_summary
 
-*Breakdown:*
-• Stock Purchase: ₹2,500
-• Electricity: ₹400
-• Transport: ₹200
-• Misc: ₹100
+        try:
+            async with async_session_maker() as db:
+                data = await get_expense_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[TG] expense report failed: {e}")
+            return "⚠️ Unable to fetch expenses right now. Please try again."
 
-📊 This month: ₹45,600"""
-    
-    async def _get_profit_report(self) -> str:
-        return """📈 *Profit Summary*
+        cat_lines = "\n".join(
+            f"• {k.title()}: ₹{v:,.0f}" for k, v in data["by_category"].items()
+        ) or "• No expenses yet"
+        return (
+            "💸 *Today's Expenses*\n\n"
+            f"Total: ₹{data['total']:,.0f}\n"
+            f"Transactions: {data['count']}\n\n"
+            f"*Breakdown:*\n{cat_lines}"
+        )
 
-*Today:*
-💰 Revenue: ₹12,450
-💸 Expenses: ₹3,200
-✨ *Profit: ₹9,250*
+    async def _get_profit_report(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_sales_summary, get_expense_summary
 
-*This Month:*
-💰 Revenue: ₹3,45,000
-💸 Expenses: ₹2,10,000
-✨ *Profit: ₹1,35,000*
+        try:
+            async with async_session_maker() as db:
+                sales = await get_sales_summary(db, store_id)
+                expenses = await get_expense_summary(db, store_id)
+        except Exception as e:
+            logger.error(f"[TG] profit report failed: {e}")
+            return "⚠️ Unable to fetch profit data right now. Please try again."
 
-Margin: 39.1% 📊"""
-    
-    async def _get_full_report(self) -> str:
-        return """📋 *Daily Business Report*
-_Date: Today_
+        net = sales["revenue"] - expenses["total"]
+        margin = (net / sales["revenue"] * 100) if sales["revenue"] else 0
+        return (
+            "📈 *Profit Summary (Today)*\n\n"
+            f"💰 Revenue: ₹{sales['revenue']:,.0f}\n"
+            f"💸 Expenses: ₹{expenses['total']:,.0f}\n"
+            f"✨ *Profit: ₹{net:,.0f}*\n"
+            f"Margin: {margin:.1f}% 📊"
+        )
 
-💰 *Sales*
-• Total: ₹12,450
-• Bills: 28
-• Avg Bill: ₹444
+    async def _get_full_report(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_daily_report
 
-💸 *Expenses*
-• Total: ₹3,200
-• Stock: ₹2,500
+        try:
+            async with async_session_maker() as db:
+                d = await get_daily_report(db, store_id)
+        except Exception as e:
+            logger.error(f"[TG] full report failed: {e}")
+            return "⚠️ Unable to fetch the report right now. Please try again."
 
-📈 *Profit*
-• Today: ₹9,250
-• Margin: 74.3%
+        sales = d["sales"]
+        return (
+            "📋 *Daily Business Report*\n_Date: Today_\n\n"
+            "💰 *Sales*\n"
+            f"• Total: ₹{sales['revenue']:,.0f}\n"
+            f"• Bills: {sales['bills']}\n"
+            f"• Avg Bill: ₹{sales['avg_bill']:,.0f}\n\n"
+            "💸 *Expenses*\n"
+            f"• Total: ₹{d['expenses']['total']:,.0f}\n\n"
+            "📈 *Profit*\n"
+            f"• Today: ₹{d['profit']:,.0f}\n\n"
+            "📦 *Inventory*\n"
+            f"• Low Stock: {d['stock']['low']} items\n"
+            f"• Out of Stock: {d['stock']['out']} items\n\n"
+            "👥 *Customers*\n"
+            f"• Total: {d['customers']['total']}\n"
+            f"• Pending: ₹{d['pending_total']:,.0f}"
+        )
 
-📦 *Inventory*
-• Low Stock: 8 items
-• Out of Stock: 3 items
-
-👥 *Customers*
-• New: 5
-• Returning: 20
-
-🏆 *Top 3 Products*
-1. Rice 5kg - ₹3,750
-2. Oil 1L - ₹2,880
-3. Sugar 1kg - ₹1,760"""
-    
     async def _get_predictions(self) -> str:
         return """🔮 *AI Sales Predictions*
 
@@ -466,7 +663,7 @@ Fri: ₹18,200 (weekend boost!)
 🛒 Stock up on:
 • Rice - high demand expected
 • Cooking oil - festival season"""
-    
+
     async def _get_suggestions(self) -> str:
         return """💡 *Smart Suggestions*
 
@@ -485,39 +682,45 @@ Based on your sales patterns:
 
 🎯 *Today's Tip:*
 Place impulse items near counter - 23% more sales!"""
-    
-    async def _get_recent_bills(self) -> str:
-        return """🧾 *Recent Bills*
 
-1. #1234 - ₹850 - 10:30 AM
-   Customer: Ramesh
-   
-2. #1233 - ₹1,200 - 10:15 AM
-   Customer: Walk-in
-   
-3. #1232 - ₹450 - 09:45 AM
-   Customer: Priya
-   
-4. #1231 - ₹2,100 - 09:30 AM
-   Customer: Kumar Store
+    async def _get_recent_bills(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_recent_bills
 
-Type /bill to create new bill."""
-    
-    async def _get_pending_payments(self) -> str:
-        return """⏳ *Pending Payments*
+        try:
+            async with async_session_maker() as db:
+                bills = await get_recent_bills(db, store_id, limit=5)
+        except Exception as e:
+            logger.error(f"[TG] recent bills failed: {e}")
+            return "⚠️ Unable to fetch bills right now. Please try again."
 
-Total Outstanding: ₹8,450
+        if not bills:
+            return "🧾 *Recent Bills*\n\nNo bills found.\n\nType /bill to create a new bill."
+        lines = "\n".join(
+            f"• {b['bill_number']} - ₹{b['total']:,.0f} ({b['customer']})"
+            for b in bills
+        )
+        return f"🧾 *Recent Bills*\n\n{lines}\n\nType /bill to create new bill."
 
-1. Kumar Store - ₹3,200
-   Due: 2 days ago ⚠️
-   
-2. Lakshmi Textiles - ₹2,750
-   Due: Tomorrow
-   
-3. Raj Traders - ₹2,500
-   Due: 3 days
+    async def _get_pending_payments(self, store_id: Optional[int]) -> str:
+        from app.database import async_session_maker
+        from app.services.bot_data import get_pending_payments
 
-💡 Send reminder to Kumar Store?"""
+        try:
+            async with async_session_maker() as db:
+                pending = await get_pending_payments(db, store_id)
+        except Exception as e:
+            logger.error(f"[TG] pending payments failed: {e}")
+            return "⚠️ Unable to fetch pending payments right now. Please try again."
+
+        if not pending:
+            return "⏳ *Pending Payments*\n\nNo outstanding balances. 🎉"
+        total = sum(p["amount"] for p in pending)
+        lines = "\n".join(
+            f"• {p['name']} - ₹{p['amount']:,.0f}"
+            for p in pending
+        )
+        return f"⏳ *Pending Payments*\n\nTotal Outstanding: ₹{total:,.0f}\n\n{lines}"
 
 
 # Global instance

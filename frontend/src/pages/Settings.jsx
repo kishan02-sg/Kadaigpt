@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Settings as SettingsIcon, Printer, RefreshCw, Check, AlertCircle, Wifi, WifiOff, Database, Key, Store, Bell, Sun, Moon, Palette, CheckCircle, XCircle, Loader2, Globe } from 'lucide-react'
+import { Settings as SettingsIcon, Printer, RefreshCw, Check, AlertCircle, Wifi, WifiOff, Database, Key, Store, Bell, Sun, Moon, Palette, CheckCircle, XCircle, Loader2, Globe, Send } from 'lucide-react'
 import api from '../services/api'
 import gstService from '../services/gstService'
 import { useTheme } from '../contexts/ThemeContext'
@@ -19,6 +19,11 @@ export default function Settings({ addToast }) {
     const [testingPrint, setTestingPrint] = useState(false)
     const [gstValidation, setGstValidation] = useState({ status: 'empty', message: '' })
     const [verifyingGst, setVerifyingGst] = useState(false)
+    const [profilePhone, setProfilePhone] = useState('')
+    const [savingProfile, setSavingProfile] = useState(false)
+    const [telegramCode, setTelegramCode] = useState('')
+    const [linkingTelegram, setLinkingTelegram] = useState(false)
+    const [telegramLinked, setTelegramLinked] = useState(null) // null = unknown, true/false = known
     const [settings, setSettings] = useState({
         storeName: localStorage.getItem('kadai_store_name') || 'My Store',
         storeAddress: localStorage.getItem('kadai_store_address') || '',
@@ -36,6 +41,11 @@ export default function Settings({ addToast }) {
         loadPrinters()
         const savedPrinter = localStorage.getItem('kadai_printer')
         if (savedPrinter) setSelectedPrinter(savedPrinter)
+
+        // Load the user's phone so the WhatsApp bot can match this number
+        api.getProfile().then(p => {
+            if (p?.phone) setProfilePhone(p.phone)
+        }).catch(() => {})
 
         // Validate existing GSTIN on load
         if (settings.gstin) {
@@ -290,6 +300,112 @@ export default function Settings({ addToast }) {
 
                 {/* WhatsApp Integration Settings */}
                 <WhatsAppSettings addToast={addToast} />
+
+                {/* My Profile (phone is what the WhatsApp bot matches on) */}
+                <div className="card settings-card">
+                    <div className="card-header">
+                        <h3 className="card-title"><Key size={20} /> My Profile</h3>
+                    </div>
+                    <div className="settings-form">
+                        <div className="form-group">
+                            <label className="form-label">My Phone Number</label>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                    type="tel"
+                                    className="form-input"
+                                    value={profilePhone}
+                                    onChange={(e) => setProfilePhone(e.target.value)}
+                                    placeholder="+91 98765 43210"
+                                    style={{ flex: 1 }}
+                                />
+                                <button
+                                    className="btn btn-primary"
+                                    disabled={savingProfile}
+                                    onClick={async () => {
+                                        setSavingProfile(true)
+                                        try {
+                                            const res = await api.updateProfile({ phone: profilePhone.trim() || null })
+                                            setProfilePhone(res?.phone || '')
+                                            addToast('Profile updated — WhatsApp bot will use this number', 'success')
+                                        } catch (err) {
+                                            addToast(err.message || 'Failed to update profile', 'error')
+                                        } finally {
+                                            setSavingProfile(false)
+                                        }
+                                    }}
+                                >
+                                    {savingProfile ? <Loader2 size={18} className="spin" /> : <Check size={18} />}
+                                    {savingProfile ? 'Saving...' : 'Save'}
+                                </button>
+                            </div>
+                            <p className="form-hint">
+                                The WhatsApp bot links messages to this number — use the same number you
+                                message the bot from.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Telegram Bot Linking */}
+                <div className="card settings-card">
+                    <div className="card-header">
+                        <h3 className="card-title"><Send size={20} /> Telegram Bot</h3>
+                    </div>
+                    <div className="settings-form">
+                        <p className="form-hint" style={{ marginBottom: '12px' }}>
+                            Link your Telegram chat to get live store reports (sales, stock, bills)
+                            directly in Telegram.
+                        </p>
+                        <div className="form-group">
+                            <label className="form-label">Link Code</label>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={telegramCode}
+                                    onChange={(e) => setTelegramCode(e.target.value)}
+                                    placeholder="Paste code from @KadaiGPTBot /link"
+                                    style={{ flex: 1 }}
+                                />
+                                <button
+                                    className="btn btn-primary"
+                                    disabled={linkingTelegram || !telegramCode.trim()}
+                                    onClick={async () => {
+                                        setLinkingTelegram(true)
+                                        try {
+                                            const res = await api.linkTelegram(telegramCode.trim())
+                                            setTelegramLinked(true)
+                                            setTelegramCode('')
+                                            addToast(res.message || 'Telegram linked successfully!', 'success')
+                                        } catch (err) {
+                                            setTelegramLinked(false)
+                                            addToast(err.message || 'Failed to link Telegram', 'error')
+                                        } finally {
+                                            setLinkingTelegram(false)
+                                        }
+                                    }}
+                                >
+                                    {linkingTelegram ? <Loader2 size={18} className="spin" /> : <Check size={18} />}
+                                    {linkingTelegram ? 'Linking...' : 'Link'}
+                                </button>
+                            </div>
+                            <p className="form-hint">
+                                In Telegram, send <code>/link</code> to your KadaiGPT bot to get a one-time
+                                code, then paste it here.
+                            </p>
+                            {telegramLinked === true && (
+                                <p style={{ color: 'var(--success)', fontSize: '0.875rem', marginTop: '8px' }}>
+                                    ✓ Telegram linked — the bot now shows your store's live data.
+                                </p>
+                            )}
+                            {telegramLinked === false && (
+                                <p style={{ color: 'var(--danger)', fontSize: '0.875rem', marginTop: '8px' }}>
+                                    Couldn't link. Check the code (it expires after 30 minutes) and try again.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </div>
 
                 {/* Language Settings */}
                 <div className="card settings-card">

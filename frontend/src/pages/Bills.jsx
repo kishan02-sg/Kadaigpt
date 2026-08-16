@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Search, Filter, Download, Eye, Printer, Calendar, X, ChevronDown, FileText, TrendingUp, ArrowUpRight, XCircle, AlertTriangle } from 'lucide-react'
 import realDataService from '../services/realDataService'
 import api from '../services/api'
+import offlineSync from '../services/offlineSync'
 import EmptyState from '../components/EmptyState'
 import FloatingActionButton from '../components/FloatingActionButton'
 
@@ -34,15 +35,24 @@ export default function Bills({ addToast, setCurrentPage }) {
             realDataService.invalidateCache('bills')
             const billList = await realDataService.getBills()
 
-            if (Array.isArray(billList) && billList.length > 0) {
-                setBills(billList)
+            // Merge bills saved while offline (marked pending_sync) on top so
+            // they're visible until their queued POST actually syncs.
+            const offlineBills = offlineSync.getOfflineBills()
+            const merged = [
+                ...offlineBills,
+                ...(Array.isArray(billList) ? billList : []),
+            ]
+
+            if (merged.length > 0) {
+                setBills(merged)
             } else {
                 setBills([])
             }
         } catch (error) {
             console.error('Failed to load bills:', error)
             addToast?.('Failed to load bills', 'error')
-            setBills([])
+            // Still show offline-saved bills even if the server is unreachable
+            setBills(offlineSync.getOfflineBills())
         } finally {
             setLoading(false)
         }
@@ -384,15 +394,22 @@ export default function Bills({ addToast, setCurrentPage }) {
                                         <td><span className="amount">₹{bill.total?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></td>
                                         <td><span className={`badge badge-${bill.payment_mode?.toLowerCase() === 'cash' ? 'success' : bill.payment_mode?.toLowerCase() === 'upi' ? 'info' : bill.payment_mode?.toLowerCase() === 'credit' ? 'error' : 'warning'}`}>{bill.payment_mode?.toLowerCase() === 'credit' ? 'DUE' : bill.payment_mode}</span></td>
                                         <td>
-                                            <span className={`badge badge-${bill.status === 'cancelled' ? 'danger' : bill.status === 'refunded' ? 'warning' : 'success'}`}>
-                                                {bill.status === 'cancelled' ? '❌ Cancelled' : bill.status === 'refunded' ? '↩️ Refunded' : '✅ Completed'}
+                                            <span className={`badge badge-${(() => { const s = (bill.status || '').toLowerCase(); return bill.is_offline || s === 'pending_sync' ? 'warning' : s === 'pending_payment' ? 'warning' : s === 'cancelled' ? 'danger' : s === 'refunded' ? 'warning' : 'success' })()}`}>
+                                                {(() => { const s = (bill.status || '').toLowerCase(); return bill.is_offline || s === 'pending_sync'
+                                                    ? '📥 Pending Sync'
+                                                    : s === 'pending_payment' ? '⏳ Awaiting UPI'
+                                                    : s === 'cancelled' ? '❌ Cancelled'
+                                                    : s === 'refunded' ? '↩️ Refunded'
+                                                    : '✅ Completed' })()}
                                             </span>
                                         </td>
                                         <td><span className="date-cell">{formatDate(bill.created_at)}</span></td>
                                         <td>
                                             <div className="action-buttons">
                                                 <button className="btn btn-ghost btn-sm" onClick={async () => {
-                                                    const fullBill = await realDataService.getBillById(bill.id)
+                                                    const fullBill = bill.is_offline
+                                                        ? bill
+                                                        : (await realDataService.getBillById(bill.id)) || bill
                                                     setSelectedBill(fullBill || bill)
                                                 }} title="View Details">
                                                     <Eye size={16} />
@@ -400,7 +417,7 @@ export default function Bills({ addToast, setCurrentPage }) {
                                                 <button className="btn btn-ghost btn-sm" onClick={() => printBill(bill)} title="Print Receipt">
                                                     <Printer size={16} />
                                                 </button>
-                                                {bill.status !== 'cancelled' && (
+                                                {!bill.is_offline && bill.status !== 'cancelled' && (
                                                     <button className="btn btn-ghost btn-sm" onClick={() => setCancellingBill(bill)} title="Cancel Bill" style={{ color: 'var(--danger-500, #ef4444)' }}>
                                                         <XCircle size={16} />
                                                     </button>

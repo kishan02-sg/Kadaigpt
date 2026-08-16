@@ -253,6 +253,41 @@ async def run_migrations():
             END IF;
         EXCEPTION WHEN others THEN NULL;
         END $$;""",
+        # Same pattern for bills.status: if it's a native Postgres ENUM, it must
+        # learn 'PENDING_PAYMENT' (checkout-QR UPI bills) before any row can use
+        # that status. No-op when the column is a plain VARCHAR.
+        """DO $$
+        DECLARE
+            col_type text;
+        BEGIN
+            SELECT udt_name INTO col_type
+            FROM information_schema.columns
+            WHERE table_name = 'bills' AND column_name = 'status';
+
+            IF col_type IS NOT NULL AND col_type NOT IN ('varchar', 'text', 'bpchar') THEN
+                EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', col_type, 'PENDING_PAYMENT');
+            END IF;
+        EXCEPTION WHEN others THEN NULL;
+        END $$;""",
+        # Razorpay checkout-QR payments (UPI verification). The unique
+        # razorpay_payment_id makes replayed webhooks hit a constraint instead
+        # of double-processing.
+        """CREATE TABLE IF NOT EXISTS payments (
+            id SERIAL PRIMARY KEY,
+            bill_id INTEGER NOT NULL REFERENCES bills(id),
+            razorpay_qr_code_id VARCHAR(100),
+            razorpay_payment_id VARCHAR(100) UNIQUE,
+            amount DOUBLE PRECISION NOT NULL,
+            status VARCHAR(20) DEFAULT 'pending',
+            qr_image_url VARCHAR(500),
+            expires_at TIMESTAMPTZ,
+            paid_at TIMESTAMPTZ,
+            note VARCHAR(255),
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_payments_bill ON payments(bill_id)",
+        "CREATE INDEX IF NOT EXISTS idx_payments_qr ON payments(razorpay_qr_code_id)",
     ]
     try:
         async with engine.begin() as conn:
@@ -542,6 +577,39 @@ _SERVERLESS_SCHEMA_STATEMENTS = [
     )""",
     "CREATE INDEX IF NOT EXISTS idx_login_history_created ON login_history(created_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_login_history_store_created ON login_history(store_id, created_at DESC)",
+    # If bills.status is a native Postgres ENUM it must learn 'PENDING_PAYMENT'
+    # before any checkout-QR bill can use it (mirrors the users.role migration).
+    # No-op when the column is a plain VARCHAR.
+    """DO $$
+    DECLARE
+        col_type text;
+    BEGIN
+        SELECT udt_name INTO col_type
+        FROM information_schema.columns
+        WHERE table_name = 'bills' AND column_name = 'status';
+
+        IF col_type IS NOT NULL AND col_type NOT IN ('varchar', 'text', 'bpchar') THEN
+            EXECUTE format('ALTER TYPE %I ADD VALUE IF NOT EXISTS %L', col_type, 'PENDING_PAYMENT');
+        END IF;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;""",
+    # Razorpay checkout-QR payments (UPI verification)
+    """CREATE TABLE IF NOT EXISTS payments (
+        id SERIAL PRIMARY KEY,
+        bill_id INTEGER NOT NULL REFERENCES bills(id),
+        razorpay_qr_code_id VARCHAR(100),
+        razorpay_payment_id VARCHAR(100) UNIQUE,
+        amount DOUBLE PRECISION NOT NULL,
+        status VARCHAR(20) DEFAULT 'pending',
+        qr_image_url VARCHAR(500),
+        expires_at TIMESTAMPTZ,
+        paid_at TIMESTAMPTZ,
+        note VARCHAR(255),
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_payments_bill ON payments(bill_id)",
+    "CREATE INDEX IF NOT EXISTS idx_payments_qr ON payments(razorpay_qr_code_id)",
 ]
 
 

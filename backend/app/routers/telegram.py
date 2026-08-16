@@ -4,14 +4,17 @@ Webhook for receiving Telegram messages
 Fast & reliable - No QR codes needed!
 """
 
-from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Request, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Dict, Any
 import logging
 import os
 import httpx
 
 from app.config import settings
+from app.database import get_db
+from app.routers.auth import get_current_active_user
 from app.services.telegram_bot import telegram_bot
 
 logger = logging.getLogger(__name__)
@@ -66,12 +69,8 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
 async def process_telegram_message(chat_id: str, text: str, user_name: str):
     """Process incoming Telegram message"""
     try:
-        # Special handling for /start command
-        if text.strip().lower() == '/start':
-            await telegram_bot.send_welcome_message(chat_id, user_name)
-            return
-        
-        # Process message and get response
+        # Process message and get response (the bot handles /start itself so it
+        # can show account-linking status and store-scoped data)
         response = await telegram_bot.process_incoming_message(chat_id, text, user_name)
         
         # Send response
@@ -103,6 +102,81 @@ class SendMessageRequest(BaseModel):
 class BroadcastRequest(BaseModel):
     message: str
     chat_ids: list[str]
+
+class TelegramLinkRequest(BaseModel):
+    """Bind the authenticated user's account to a Telegram chat via a one-time code."""
+    code: str
+
+
+@router.post("/link")
+async def link_telegram_chat(
+    payload: TelegramLinkRequest,
+    current_user=Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Link the current user's account to a Telegram chat.
+
+    Flow: the user sends /link to the bot -> bot stores a one-time code (valid
+    30 min) -> the user enters that code here -> this binds the chat to the
+    user's account so the bot shows store-scoped data.
+    """
+    from datetime import datetime
+    from sqlalchemy import select
+    from app.models import AuthSecurityState, User
+
+    code = (payload.code or "").strip().upper()
+    if not code:
+        raise HTTPException(status_code=400, detail="Code is required")
+
+    result = await db.execute(
+        select(AuthSecurityState).where(
+            AuthSecurityState.kind == "telegram_link",
+            AuthSecurityState.key == code,
+        )
+    )
+    pending = result.scalar_one_or_none()
+
+    if not pending:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid link code. Send /link to the Telegram bot to get a new one."
+        )
+    if pending.expires_at and pending.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=400,
+            detail="Link code expired. Send /link to the Telegram bot for a new one."
+        )
+
+    chat_id = (pending.data or {}).get("chat_id")
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="Invalid link code payload.")
+
+    # A chat can only be bound to one account.
+    existing = await db.execute(
+        select(User).where(
+            User.telegram_chat_id == chat_id,
+            User.id != current_user.id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=409,
+            detail="This Telegram chat is already linked to another account."
+        )
+
+    # get_current_user returns a lightweight namespace (raw SQL) — load the
+    # real ORM row so the attribute change is actually persisted by commit().
+    user_row = await db.execute(select(User).where(User.id == current_user.id))
+    user = user_row.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.telegram_chat_id = chat_id
+    await db.delete(pending)
+    await db.commit()
+    logger.info(f"User {current_user.id} linked Telegram chat {chat_id}")
+    return {"success": True, "message": "Telegram chat linked successfully!", "chat_id": chat_id}
 
 
 @router.post("/send")

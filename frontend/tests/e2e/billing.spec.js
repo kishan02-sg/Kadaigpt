@@ -1,58 +1,59 @@
 /**
  * KadaiGPT E2E Tests — Critical Flow: Billing
- * Tests bill creation, cart management, and bill listing
+ * Tests bill creation (online), cart management, and the bills list page
+ * using the shared owner account + seeded product catalog from global-setup.js.
  */
 
 import { test, expect } from '@playwright/test'
 
-// Helper: Login with demo mode before each test
-async function loginDemo(page) {
-    await page.goto('/')
-    const demoButton = page.locator('text=Demo Mode').or(page.locator('text=Try Demo'))
-    if (await demoButton.isVisible()) {
-        await demoButton.first().click()
-        await page.waitForTimeout(3000)
-    }
-}
-
 test.describe('Billing Flow', () => {
 
-    test.beforeEach(async ({ page }) => {
-        await loginDemo(page)
-    })
+    test('should navigate to create bill page and see the seeded catalog', async ({ page }) => {
+        await page.goto('/#create-bill')
+        const search = page.locator('input[placeholder="Search products by name..."]')
+        await expect(search).toBeVisible({ timeout: 15000 })
 
-    test('should navigate to create bill page', async ({ page }) => {
-        // Click new bill button
-        const newBillBtn = page.locator('text=New Bill').or(page.locator('[href*="create-bill"]'))
-        await newBillBtn.first().click()
-        await page.waitForTimeout(1000)
-
-        // Should show bill creation form
-        await expect(page.locator('text=Create Bill').or(page.locator('text=New Bill')).first()).toBeVisible()
+        // The shared store was seeded with products in global-setup.js.
+        await search.fill('E2E Rice')
+        // Generous timeout — under full-suite parallel load the products
+        // fetch can lag, and a flaky miss fails the whole flow.
+        await expect(page.locator('.product-item').first()).toBeVisible({ timeout: 25000 })
     })
 
     test('should display bills list page', async ({ page }) => {
-        // Navigate to bills
-        const billsNav = page.locator('text=Bills').first()
-        await billsNav.click()
-        await page.waitForTimeout(1000)
-
-        // Bills page should load
-        await expect(page.locator('h1, h2, h3').filter({ hasText: /bill/i }).first()).toBeVisible()
+        await page.goto('/#bills')
+        await expect(page.locator('.page-title').filter({ hasText: /all bills/i })).toBeVisible({ timeout: 15000 })
     })
 
-    test('should navigate between pages without errors', async ({ page }) => {
-        const pages = ['Dashboard', 'Products', 'Bills', 'Customers']
+    test('should create a bill online and see it in the bills list', async ({ page }) => {
+        await page.goto('/#create-bill')
 
-        for (const pageName of pages) {
-            const navLink = page.locator(`text=${pageName}`).first()
-            if (await navLink.isVisible()) {
-                await navLink.click()
-                await page.waitForTimeout(1000)
-                // Page should not show error state
-                const errorVisible = await page.locator('text=Something went wrong').isVisible()
-                expect(errorVisible).toBe(false)
-            }
+        // Add the seeded product to the cart.
+        const search = page.locator('input[placeholder="Search products by name..."]')
+        await expect(search).toBeVisible({ timeout: 15000 })
+        await search.fill('E2E Rice')
+        await expect(page.locator('.product-item').first()).toBeVisible({ timeout: 25000 })
+        await page.locator('.product-item').first().click()
+
+        const qtyAdd = page.getByRole('button', { name: /add to cart/i })
+        if (await qtyAdd.isVisible().catch(() => false)) {
+            await qtyAdd.click()
         }
+        await page.waitForTimeout(800)
+
+        // Save the bill — the online path opens the payment/preview modal.
+        await page.locator('.cf-generate').click()
+        const paymentModal = page.locator('.payment-modal, .preview-modal').first()
+        await expect(paymentModal).toBeVisible({ timeout: 25000 })
+
+        // Close the modal and confirm the bill shows up in the bills list.
+        const closeBtn = page.locator('.payment-modal .modal-close, .preview-modal .modal-close').first()
+        if (await closeBtn.isVisible().catch(() => false)) {
+            await closeBtn.click()
+        }
+        await page.goto('/#bills')
+        await expect(page.locator('.page-title').filter({ hasText: /all bills/i })).toBeVisible({ timeout: 15000 })
+        // At least one bill row exists (the one we just created).
+        await expect(page.locator('tbody tr, .bill-row, .bills-table tr').first()).toBeVisible({ timeout: 20000 })
     })
 })

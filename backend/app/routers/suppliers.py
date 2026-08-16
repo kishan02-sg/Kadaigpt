@@ -101,22 +101,64 @@ def save_user_orders(user_id: int, orders: list):
 
 # IMPORTANT: Specific routes must come before /{supplier_id} routes
 
+
+def _order_to_dict(o, supplier_name: str = "") -> dict:
+    """Convert a PurchaseOrder ORM row to the response shape the frontend expects."""
+    return {
+        "id": o.id,
+        "order_no": o.order_number,
+        "supplier_id": o.supplier_id,
+        "supplier_name": supplier_name or "",
+        "items": o.items or [],
+        "item_count": o.item_count or 0,
+        "amount": o.amount or 0.0,
+        "status": o.status or "pending",
+        "notes": o.notes,
+        "date": o.created_at.isoformat() if o.created_at else None,
+        "expected_delivery": o.expected_delivery.isoformat() if o.expected_delivery else None,
+        "created_at": o.created_at.isoformat() if o.created_at else None,
+    }
+
+
 @router.get("/stats/summary", response_model=dict)
 async def get_supplier_stats(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get supplier statistics
+    Get supplier statistics (DB-backed)
     """
-    suppliers = get_user_suppliers(current_user.id)
-    orders = get_user_orders(current_user.id)
-    
-    total_suppliers = len(suppliers)
-    total_pending = sum(s['pending_amount'] for s in suppliers)
-    pending_orders = sum(1 for o in orders if o['status'] == 'pending')
-    total_orders = len(orders)
-    
+    from app.models import Supplier, PurchaseOrder
+
+    result = await db.execute(
+        select(func.count(Supplier.id)).where(
+            Supplier.store_id == current_user.store_id,
+            Supplier.is_active == True,  # noqa: E712
+        )
+    )
+    total_suppliers = result.scalar() or 0
+
+    result = await db.execute(
+        select(func.coalesce(func.sum(Supplier.pending_amount), 0)).where(
+            Supplier.store_id == current_user.store_id,
+            Supplier.is_active == True,  # noqa: E712
+        )
+    )
+    total_pending = result.scalar() or 0
+
+    result = await db.execute(
+        select(func.count(PurchaseOrder.id)).where(
+            PurchaseOrder.store_id == current_user.store_id,
+            PurchaseOrder.status == "pending",
+        )
+    )
+    pending_orders = result.scalar() or 0
+
+    result = await db.execute(
+        select(func.count(PurchaseOrder.id)).where(PurchaseOrder.store_id == current_user.store_id)
+    )
+    total_orders = result.scalar() or 0
+
     return {
         "total_suppliers": total_suppliers,
         "total_pending": total_pending,
@@ -133,17 +175,24 @@ async def get_purchase_orders(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Get all purchase orders
+    Get all purchase orders (DB-backed, store-scoped)
     """
-    orders = get_user_orders(current_user.id)
-    
+    from app.models import PurchaseOrder, Supplier
+
+    query = select(PurchaseOrder, Supplier.name).join(
+        Supplier, Supplier.id == PurchaseOrder.supplier_id
+    ).where(PurchaseOrder.store_id == current_user.store_id)
+
     if order_status:
-        orders = [o for o in orders if o['status'] == order_status]
-    
+        query = query.where(PurchaseOrder.status == order_status)
+
     if supplier_id:
-        orders = [o for o in orders if o['supplier_id'] == supplier_id]
-    
-    return orders
+        query = query.where(PurchaseOrder.supplier_id == supplier_id)
+
+    query = query.order_by(PurchaseOrder.created_at.desc())
+    result = await db.execute(query)
+    rows = result.all()
+    return [_order_to_dict(o, name) for o, name in rows]
 
 
 @router.post("/orders", response_model=dict)
@@ -153,50 +202,73 @@ async def create_purchase_order(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Create a new purchase order
+    Create a new purchase order (DB-backed, store-scoped)
     """
-    suppliers = get_user_suppliers(current_user.id)
-    supplier = next((s for s in suppliers if s['id'] == order.supplier_id), None)
-    
+    from app.models import Supplier, PurchaseOrder
+    from app.routers.audit import log_audit_event
+
+    result = await db.execute(
+        select(Supplier).where(
+            Supplier.id == order.supplier_id,
+            Supplier.store_id == current_user.store_id,
+        )
+    )
+    supplier = result.scalar_one_or_none()
+
     if not supplier:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Supplier not found"
         )
-    
-    orders = get_user_orders(current_user.id)
-    
+
+    if not order.items:
+        raise HTTPException(status_code=400, detail="Order must have at least one item")
+
     # Calculate total
     total_amount = sum(item.quantity * item.unit_price for item in order.items)
-    
+
     # Generate order number
-    order_number = f"PO-{datetime.utcnow().strftime('%Y')}-{str(len(orders) + 1).zfill(4)}"
-    
-    new_order = {
-        "id": len(orders) + 1 if orders else 1,
-        "order_no": order_number,
-        "supplier_id": order.supplier_id,
-        "supplier_name": supplier['name'],
-        "items": [item.dict() for item in order.items],
-        "item_count": len(order.items),
-        "amount": total_amount,
-        "status": "pending",
-        "notes": order.notes,
-        "date": datetime.utcnow().isoformat(),
-        "expected_delivery": None,
-        "created_at": datetime.utcnow().isoformat()
-    }
-    
-    orders.insert(0, new_order)
-    save_user_orders(current_user.id, orders)
-    
+    count_result = await db.execute(
+        select(func.count(PurchaseOrder.id)).where(PurchaseOrder.store_id == current_user.store_id)
+    )
+    seq = count_result.scalar() or 0
+    # order_number is UNIQUE across all stores — include store_id so two
+    # stores' first POs (or a re-run against the same DB) can't collide.
+    order_number = f"PO-{datetime.utcnow().strftime('%Y')}-{current_user.store_id}-{str(seq + 1).zfill(4)}"
+
+    po = PurchaseOrder(
+        store_id=current_user.store_id,
+        supplier_id=supplier.id,
+        order_number=order_number,
+        items=[item.model_dump() for item in order.items],
+        item_count=len(order.items),
+        amount=round(total_amount, 2),
+        status="pending",
+        notes=order.notes,
+    )
+    db.add(po)
+    await db.flush()
+
     # Update supplier stats
-    supplier['total_orders'] += 1
-    supplier['pending_amount'] += total_amount
-    supplier['last_order'] = datetime.utcnow().isoformat()
-    save_user_suppliers(current_user.id, suppliers)
-    
-    return new_order
+    supplier.total_orders = (supplier.total_orders or 0) + 1
+    supplier.pending_amount = (supplier.pending_amount or 0) + total_amount
+    supplier.last_order = datetime.utcnow()
+
+    await log_audit_event(
+        db,
+        store_id=current_user.store_id,
+        user_id=current_user.id,
+        action="create",
+        entity_type="purchase_order",
+        entity_id=po.id,
+        new_values={"order_number": order_number, "supplier_id": supplier.id,
+                    "amount": round(total_amount, 2), "source": "app"},
+        ip_address="app",
+    )
+
+    await db.commit()
+    await db.refresh(po)
+    return _order_to_dict(po, supplier.name)
 
 
 @router.put("/orders/{order_id}/status", response_model=dict)
@@ -207,38 +279,51 @@ async def update_order_status(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Update purchase order status
+    Update purchase order status (DB-backed, store-scoped)
     """
+    from app.models import PurchaseOrder, Supplier
+
     valid_statuses = ["pending", "confirmed", "shipped", "delivered", "cancelled"]
     if new_status not in valid_statuses:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
         )
-    
-    orders = get_user_orders(current_user.id)
-    order_index = next((i for i, o in enumerate(orders) if o['id'] == order_id), None)
-    
-    if order_index is None:
+
+    result = await db.execute(
+        select(PurchaseOrder, Supplier.name).join(
+            Supplier, Supplier.id == PurchaseOrder.supplier_id
+        ).where(
+            PurchaseOrder.id == order_id,
+            PurchaseOrder.store_id == current_user.store_id,
+        )
+    )
+    row = result.first()
+
+    if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Order not found"
         )
-    
-    old_status = orders[order_index]['status']
-    orders[order_index]['status'] = new_status
-    
+
+    order, supplier_name = row
+    old_status = order.status
+    order.status = new_status
+
     # If delivered, clear pending amount from supplier
     if new_status == "delivered" and old_status != "delivered":
-        suppliers = get_user_suppliers(current_user.id)
-        supplier = next((s for s in suppliers if s['id'] == orders[order_index]['supplier_id']), None)
+        supplier_result = await db.execute(
+            select(Supplier).where(
+                Supplier.id == order.supplier_id,
+                Supplier.store_id == current_user.store_id,
+            )
+        )
+        supplier = supplier_result.scalar_one_or_none()
         if supplier:
-            supplier['pending_amount'] = max(0, supplier['pending_amount'] - orders[order_index]['amount'])
-            save_user_suppliers(current_user.id, suppliers)
-    
-    save_user_orders(current_user.id, orders)
-    
-    return orders[order_index]
+            supplier.pending_amount = max(0, (supplier.pending_amount or 0) - (order.amount or 0))
+
+    await db.commit()
+    return _order_to_dict(order, supplier_name)
 
 
 # ==================== SUPPLIER CRUD ROUTES (DB-backed) ====================

@@ -65,6 +65,16 @@ const ROLE_NAV_VISIBLE = {
     inventory_manager: ['Dashboard', 'Products', 'Suppliers', 'Import/Export', 'Analytics'],
 }
 
+// Mobile uses the bottom nav (src/components/MobileNav.jsx), which shows a
+// per-role subset of the same items in its primary row; the rest live behind
+// the "More" button. These are the primary items each role should see there
+// (labels resolve to the same i18n words as desktop).
+const MOBILE_NAV_VISIBLE = {
+    manager: ['Dashboard', 'New Bill', 'Products', 'Analytics'],
+    cashier: ['New Bill', 'Bills', 'Products', 'Customers'],
+    inventory_manager: ['Products', 'Suppliers', 'Import/Export'],
+}
+
 // Top-navbar items belonging to OTHER roles that must NOT be visible
 const ROLE_NAV_HIDDEN = {
     manager: ['Loyalty', 'Suppliers', 'Import/Export'],
@@ -75,6 +85,10 @@ const ROLE_NAV_HIDDEN = {
 const STAFF_ROLES = ['manager', 'cashier', 'inventory_manager']
 
 test.describe.configure({ mode: 'serial' })
+
+// This spec registers its own owner via the UI — start unauthenticated
+// (the suite-wide storageState would otherwise boot it logged in).
+test.use({ storageState: { cookies: [], origins: [] } })
 
 test('Owner registers and creates staff for all 3 roles', async ({ page }) => {
     test.setTimeout(240000)
@@ -166,14 +180,30 @@ for (const role of STAFF_ROLES) {
 
         await dismissOnboarding(page)
 
-        const nav = page.locator('nav.nav-links')
+        // Desktop uses the sidebar (nav.nav-links) with the full role nav;
+        // mobile uses the bottom nav (nav.mobile-nav), which shows only the
+        // role's primary items. Both render the role's items with aria-labels,
+        // so the same hidden checks apply; visible checks use the per-viewport
+        // item list (labels resolve to the same i18n words on both).
+        const isMobile = page.viewportSize().width <= 768
+        // On mobile the bottom nav is deliberately hidden on the billing
+        // screen (fullscreen checkout — see App.css .page-create-bill).
+        // The cashier lands there by default, so move to another page in
+        // the role's nav before checking the nav.
+        if (isMobile && (await page.locator('.page-create-bill').count())) {
+            await page.evaluate(() => { window.location.hash = '#bills' })
+            await page.waitForTimeout(800)
+        }
+        const nav = isMobile ? page.locator('nav.mobile-nav') : page.locator('nav.nav-links')
+        const navItem = isMobile ? '.mobile-nav-item' : '.nav-link'
+        const visibleLabels = isMobile ? MOBILE_NAV_VISIBLE[role] : ROLE_NAV_VISIBLE[role]
         await expect(nav).toBeVisible()
 
-        for (const label of ROLE_NAV_VISIBLE[role]) {
-            await expect(nav.locator(`.nav-link[aria-label="${label}"]`), `${role} should see "${label}"`).toBeVisible()
+        for (const label of visibleLabels) {
+            await expect(nav.locator(`${navItem}[aria-label="${label}"]`), `${role} should see "${label}"`).toBeVisible()
         }
         for (const label of ROLE_NAV_HIDDEN[role]) {
-            await expect(nav.locator(`.nav-link[aria-label="${label}"]`), `${role} should NOT see "${label}"`).toHaveCount(0)
+            await expect(nav.locator(`${navItem}[aria-label="${label}"]`), `${role} should NOT see "${label}"`).toHaveCount(0)
         }
 
         await shot(page, `12-${role}-nav-verified`)

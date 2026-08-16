@@ -32,7 +32,8 @@ from app.routers import (
     whatsapp_router,
     dashboard_router,
     analytics_router,
-    notifications_router
+    notifications_router,
+    payments_router
 )
 from app.routers.bulk import router as bulk_router
 from app.routers.agents import router as agents_router
@@ -186,7 +187,7 @@ class SecurityASGIMiddleware:
                 client_addr = scope.get("client")
                 client_ip = client_addr[0] if client_addr else "unknown"
 
-            limit_type = get_rate_limit_type(path)
+            limit_type = get_rate_limit_type(path, scope.get("method", "GET"))
             limits = RATE_LIMITS.get(limit_type, RATE_LIMITS['api'])
             allowed, remaining = rate_limiter.check_rate_limit(
                 f"{client_ip}:{limit_type}",
@@ -224,7 +225,7 @@ class SecurityASGIMiddleware:
                      b"default-src 'self'; "
                      b"script-src 'self' 'unsafe-inline' https://checkout.razorpay.com; "
                      b"style-src 'self' 'unsafe-inline'; "
-                     b"img-src 'self' data: blob: https://*.razorpay.com; "
+                     b"img-src 'self' data: blob: https://*.razorpay.com https://rzp.io; "
                      b"font-src 'self' data:; "
                      b"connect-src 'self' https:; "
                      b"frame-src 'self' https://api.razorpay.com https://*.razorpay.com; "
@@ -380,6 +381,7 @@ app.include_router(inapp_notifications_router)  # Already has /api/notifications
 app.include_router(backup_router, prefix="/api/v1")  # /api/v1/backup
 app.include_router(privacy_router, prefix="/api/v1")  # /api/v1/privacy
 app.include_router(admin_router, prefix="/api/v1")  # /api/v1/admin/* (platform admin dashboard)
+app.include_router(payments_router, prefix="/api/v1")  # /api/v1/payments/* (Razorpay checkout QR + webhook)
 
 
 # Serve static files from frontend build (assets like JS, CSS, images)

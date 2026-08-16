@@ -5,7 +5,7 @@ Complete data models for the retail operations platform
 
 from sqlalchemy import (
     Column, Integer, String, Float, Boolean, DateTime, Text, 
-    ForeignKey, Enum, JSON, LargeBinary
+    ForeignKey, Enum, JSON, LargeBinary, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -83,6 +83,8 @@ class User(Base):
     phone = Column(String(20), unique=True, index=True)
     password_hash = Column(String(255), nullable=False)
     staff_id = Column(String(20), unique=True, index=True, nullable=True)  # For staff login (e.g., KDG-4821)
+    # Telegram bot binding: set when the owner links their Telegram chat in-app.
+    telegram_chat_id = Column(String(64), unique=True, index=True, nullable=True)
     
     # Profile
     full_name = Column(String(200), nullable=False)
@@ -180,7 +182,14 @@ class Product(Base):
 class Bill(Base):
     """Bill/Invoice model"""
     __tablename__ = "bills"
-    
+
+    # Offline-sync dedup: at most one bill per (store, local_id). Multiple
+    # NULL local_ids are fine (unique allows that) — only actual offline-sync
+    # replays collide, which is exactly what we want to reject.
+    __table_args__ = (
+        UniqueConstraint("store_id", "local_id", name="uq_bills_store_local_id"),
+    )
+
     id = Column(Integer, primary_key=True, index=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=False)
     cashier_id = Column(Integer, ForeignKey("users.id"))
@@ -223,6 +232,7 @@ class Bill(Base):
     store = relationship("Store", back_populates="bills")
     cashier = relationship("User", back_populates="bills")
     items = relationship("BillItem", back_populates="bill", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="bill", cascade="all, delete-orphan")
 
 
 class BillItem(Base):
@@ -252,6 +262,39 @@ class BillItem(Base):
     # Relationships
     bill = relationship("Bill", back_populates="items")
     product = relationship("Product", back_populates="bill_items")
+
+
+class Payment(Base):
+    """Razorpay QR payment record linking a checkout QR to a bill.
+
+    Created when a UPI bill is generated with a real Razorpay QR. The unique
+    constraint on `razorpay_payment_id` is the webhook idempotency guard:
+    Razorpay retries webhooks, and a replayed event for the same payment_id
+    hits a constraint violation instead of double-crediting the bill.
+
+    status: pending | paid | expired | overridden | failed
+      - paid        -> confirmed by the Razorpay webhook (the ONLY way)
+      - expired     -> QR timed out / cashier cancelled; stock restored
+      - overridden  -> cashier recorded the sale under another method (cash/card)
+    """
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    bill_id = Column(Integer, ForeignKey("bills.id"), nullable=False, index=True)
+    razorpay_qr_code_id = Column(String(100), index=True)
+    # unique = webhook idempotency guard (replayed events violate the constraint)
+    razorpay_payment_id = Column(String(100), unique=True, index=True, nullable=True)
+    amount = Column(Float, nullable=False)
+    status = Column(String(20), default="pending")
+    qr_image_url = Column(String(500))
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    note = Column(String(255))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    bill = relationship("Bill", back_populates="payments")
 
 
 class HandwrittenBill(Base):
@@ -482,7 +525,9 @@ class Supplier(Base):
     # Basic Info
     name = Column(String(200), nullable=False)
     contact = Column(String(200))  # Contact person
-    phone = Column(String(20), nullable=False)
+    # Nullable so bot-created suppliers (no phone collected in the chat flow)
+    # can be created without inventing a placeholder number.
+    phone = Column(String(20), nullable=True)
     email = Column(String(200))
     address = Column(Text)
     category = Column(String(100), default="General")

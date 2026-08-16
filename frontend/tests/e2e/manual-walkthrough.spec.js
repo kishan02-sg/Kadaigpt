@@ -44,6 +44,10 @@ async function shot(page, name) {
 
 test.describe.configure({ mode: 'serial' })
 
+// This spec registers its own owner via the UI — start unauthenticated
+// (the suite-wide storageState would otherwise boot it logged in).
+test.use({ storageState: { cookies: [], origins: [] } })
+
 test('Full shopkeeper walkthrough', async ({ page }, testInfo) => {
     test.setTimeout(180000)
 
