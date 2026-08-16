@@ -1,0 +1,34 @@
+# health-monitor.yml
+# What: cron monitor for the production app. Every 15 minutes it hits
+#       /api/health and FAILS the run when the database is not "healthy".
+#       A failed run sends the default GitHub Actions failure notification
+#       (email to users with notifications enabled for this repo).
+# Why: a plain "is the site up" monitor (e.g. basic UptimeRobot HTTPS check)
+#       returns 200 even when the DB is down — the app boots and serves
+#       /api/health with database.status = "unhealthy". This checks the
+#       JSON body, not just the HTTP status.
+# Note: scheduled workflows only run on the default branch. Enable if
+#       GitHub Actions is off for the repo. For richer alerts (SMS/call),
+#       use UptimeRobot with keyword monitoring: keyword "unhealthy",
+#       alert when keyword EXISTS (see DEPLOYMENT_GUIDE.md).
+name: Production health monitor
+
+on:
+  schedule:
+    # every 15 minutes (cron runs on the default branch)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {} # allow manual "Run workflow" from the Actions tab
+
+jobs:
+  check-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check /api/health
+        run: |
+          BODY=$(curl -sS -m 30 https://kadaigpt-main.vercel.app/api/health)
+          DB_STATUS=$(printf '%s' "$BODY" | jq -r '.database.status')
+          if [ "$DB_STATUS" != "healthy" ]; then
+            echo "::error::Production database UNHEALTHY — ${BODY}"
+            exit 1
+          fi
+          echo "✅ /api/health: database ${DB_STATUS}"

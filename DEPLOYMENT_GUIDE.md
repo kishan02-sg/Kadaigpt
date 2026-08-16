@@ -1,6 +1,78 @@
-# 🚀 KadaiGPT - Deployment Guide (Render.com)
+# 🚀 KadaiGPT - Deployment Guide
 
-## Why Render.com?
+> ⚠️ **CURRENT STACK: Vercel + Supabase** (`https://kadaigpt-main.vercel.app`).
+> The rest of this document describes the older Render.com architecture and is
+> kept for reference only — the URLs there (`kadaigpt.onrender.com`) are stale.
+
+---
+
+## 🔴 FIRST AID: Fix the broken `DATABASE_URL` (do this before anything else)
+
+Production reports `database: unhealthy — (ENOTFOUND) postgres.cgekqqvbipbpduwcapnr not found`.
+That hostname does not resolve — either the Supabase project was deleted, or the
+connection string uses a host format that never existed. The app code is live and
+healthy; **every store operation needs the DB, so until this is fixed the app
+cannot serve real data.**
+
+### What a correct Supabase connection string looks like
+
+Supabase gives you these in **Dashboard → Project Settings → Database →
+Connection string → URI**. Copy the **Transaction pooler** one for Vercel:
+
+```
+postgresql://postgres.<PROJECT_REF>:<PASSWORD>@aws-0-<REGION>.pooler.supabase.com:6543/postgres?sslmode=require
+```
+
+- `PROJECT_REF` — the short identifier from your project URL (e.g. `cgekqqvbipbpduwcapnr`).
+  With the pooler, the **username includes the ref** (`postgres.<ref>`); the host is
+  `aws-0-<region>.pooler.supabase.com`, **not** `<ref>.supabase.co`.
+- `<PASSWORD>` — your DB password, URL-encoded if it contains special characters
+  (e.g. `!` → `%21`, `@` → `%40`).
+- `sslmode=require` — Supabase requires TLS.
+
+Older / direct-connection format (only if the pooler isn't available):
+
+```
+postgresql://postgres:<PASSWORD>@db.<PROJECT_REF>.supabase.co:5432/postgres?sslmode=require
+```
+
+If the project `cgekqqvbipbpduwcapnr` no longer exists in your Supabase account,
+create a new project and use its fresh connection string.
+
+### Steps in the Vercel dashboard
+
+1. Go to **vercel.com → your team → `kadaigpt-main` → Settings → Environment Variables**.
+2. Find `DATABASE_URL`, click **Replace**, paste the corrected connection string, **Save**.
+3. While there, confirm these are set for **Production AND Preview**: `SECRET_KEY`,
+   `JWT_SECRET_KEY`, `APP_ENV`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`,
+   `RAZORPAY_WEBHOOK_SECRET`. (Preview currently can't boot without the first three.)
+4. Env-var changes do **not** auto-redeploy. Go to **Deployments → ⋯ → Redeploy**
+   (or push a commit).
+5. Verify:
+   ```bash
+   curl https://kadaigpt-main.vercel.app/api/health
+   # → "database": {"status": "healthy"}
+   ```
+6. Run the end-to-end smoke test:
+   ```bash
+   powershell -ExecutionPolicy Bypass -File verify_production.ps1
+   ```
+   It registers a throwaway store, creates a UPI bill, and confirms the payment
+   state (real Razorpay QR when configured, manual flow otherwise).
+
+### Monitoring (alerts when the DB goes down)
+
+- **GitHub Actions (already in repo):** `.github/workflows/health-monitor.yml`
+  checks `/api/health` every 15 min and fails the run (email alert) when
+  `database.status` is not `healthy`. Requires GitHub Actions enabled on the repo.
+- **UptimeRobot (richer alerts — SMS/call):** add an HTTP(s) monitor on
+  `https://kadaigpt-main.vercel.app/api/health`, then set **Alert when keyword
+  EXISTS** → keyword `unhealthy`. A plain uptime monitor is NOT enough — the app
+  returns HTTP 200 even when the DB is down.
+
+---
+
+## Why Render.com? (historical)
 
 | Feature | Vercel ❌ | Render ✅ |
 |---------|----------|----------|

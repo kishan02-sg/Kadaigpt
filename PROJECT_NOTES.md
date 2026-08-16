@@ -13,7 +13,10 @@ powershell -File predeploy_check.ps1
 ```
 
 It verifies: frontend production build, backend import sanity, no `NOW()` in raw
-`text()` SQL, bcrypt pinned to 4.2.1. The judgment checks it can't automate —
+`text()` SQL, bcrypt pinned to 4.2.1, no known bloat deps in requirements, and a
+Vercel Python bundle size estimate (hard gate at 210 MB vs the platform's 225 MB
+cap; warns when the estimate can't be computed, e.g. asyncpg 0.30.0 has no wheel
+for local Python 3.14). The judgment checks it can't automate —
 schema changes mirrored in `ensure_serverless_schema()`, every query store-scoped,
 new UI strings in all 6 locale files, new env vars enabled for Production AND
 Preview — are in CLAUDE.md.
@@ -21,6 +24,23 @@ Preview — are in CLAUDE.md.
 ## History
 
 *Dated entries, newest first: what happened, what was decided, what to remember.*
+
+### 2026-08-16 (post-deploy hardening)
+Committed on `main` after the production deploy: `predeploy_check.ps1` now 6
+checks (added **known-bloat-deps scan** — blocks google-generativeai/grpcio/
+protobuf/tensorflow/torch/opencv/scipy/pandas/etc — and a **bundle size estimate**
+that hard-fails above 210 MB when the temp-venv install succeeds, warns otherwise;
+local pip can't build `asyncpg==0.30.0` on Python 3.14, a tooling gap not a
+deploy issue). New `.github/workflows/health-monitor.yml`: scheduled every 15 min,
+hits `/api/health`, fails the run (email alert) when `database.status != healthy`
+— a plain uptime check returns 200 even with the DB down. New
+`verify_production.ps1` smoke test: health → register throwaway store → create UPI
+bill → confirm payment state; verified against prod that it fails ONLY at the DB
+step (register 422 was fixed: email-validator rejects the `.test` TLD, and the
+phone field needed exactly 10 digits). `DEPLOYMENT_GUIDE.md` gained a "FIRST AID"
+section: exact Vercel env-var steps + correct Supabase connection string formats
+(pooler: `postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres?sslmode=require`,
+direct: `db.<ref>.supabase.co:5432`) and the UptimeRobot keyword variant.
 
 ### 2026-07-07
 Pre-deploy check script added and tested (all 4 checks passed; 216 routes import).
