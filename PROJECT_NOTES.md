@@ -25,6 +25,30 @@ Preview — are in CLAUDE.md.
 
 *Dated entries, newest first: what happened, what was decided, what to remember.*
 
+### 2026-08-17 (schema bootstrap bug — auth 500s in prod)
+`verify_production.ps1` failed at register: `/api/v1/auth/register`, `/login`, and
+`/staff-login` all returned **500** with `UndefinedColumnError: column
+users.telegram_chat_id does not exist` (pulled from Vercel function logs). The
+prod Supabase DB predates commit `e4cf3b2` (2026-08-16), which added the
+Telegram-binding column to the `User` model — and `_SERVERLESS_SCHEMA_STATEMENTS`
+never added it, so EVERY auth query SELECTs a column the DB doesn't have.
+
+Root cause was worse than one missing column: `ensure_serverless_schema()` ran
+all statements in ONE transaction, and Postgres aborts the whole transaction on
+any error — so the first failing statement silently killed every statement after
+it, while the flag still logged "schema ensured". **Fixed in `database.py`:**
+each statement now runs in its own SAVEPOINT (`conn.begin_nested()`), so every
+statement succeeds or rolls back independently and the rest of the list still
+applies to old DBs.
+
+Also added the other same-era landmines so we don't fix one 500 at a time:
+`users.telegram_chat_id`, `bills.local_id` + `idx_bills_store_local_id`
+(offline billing), `suppliers.phone` DROP NOT NULL (DO block), and
+`CREATE TABLE IF NOT EXISTS subscriptions` (the list was ALTERing a table it
+never created). `pytest` 275/275 green. Pushed to `main`; after Vercel
+redeploy, a failed login returns 401 (column exists) and `/api/health` reports
+`database: healthy`.
+
 ### 2026-08-16 (post-deploy hardening)
 Committed on `main` after the production deploy: `predeploy_check.ps1` now 6
 checks (added **known-bloat-deps scan** — blocks google-generativeai/grpcio/
@@ -90,15 +114,15 @@ Vercel's 225 MB cap) — migrated AI agents from `google.generativeai`
 (grpcio/protobuf, ~113 MB) to `google-genai` (httpx-based), then bumped
 `httpx` to 0.28.1 to satisfy google-genai's resolver.
 
-**Still open before the app is truly usable in prod:**
-1. `DATABASE_URL` in Vercel is stale — host `postgres.cgekqqvbipbpduwcapnr...`
-   returns ENOTFOUND, so `/api/health` reports `database: unhealthy`. Needs the
-   current Supabase connection string (was broken before this deploy too).
-2. Enable new env var `RAZORPAY_WEBHOOK_SECRET` for Production AND Preview.
-3. Razorpay dashboard: register webhook URL
-   `https://<domain>/api/v1/payments/webhook` for the `qr_code.credited` event.
-4. `SECRET_KEY`/`JWT_SECRET_KEY`/`APP_ENV` are Production-only — Preview
-   deployments fail the secret fail-fast check; enable for Preview too.
+**Still open before the app is truly usable in prod (status as of 2026-08-17,
+see entry above):**
+1. ✅ `DATABASE_URL` — fixed; `/api/health` reports `database: healthy`.
+2. ⏸ Razorpay (`RAZORPAY_KEY_ID`/`KEY_SECRET`/`WEBHOOK_SECRET` + webhook
+   registration) — deferred by owner decision; manual UPI "unverified" flow is
+   active in the meantime.
+3. ⏸ Razorpay webhook registration — deferred with #2.
+4. ❌ `SECRET_KEY`/`JWT_SECRET_KEY`/`APP_ENV` are Production-only — Preview
+   deployments still fail the secret fail-fast check; enable for Preview too.
 
 <!-- Template:
 ### YYYY-MM-DD

@@ -376,6 +376,10 @@ _serverless_schema_ensured = False
 # Idempotent statements — safe to run repeatedly. Postgres only.
 _SERVERLESS_SCHEMA_STATEMENTS = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens_valid_after TIMESTAMPTZ",
+    # Telegram bot binding (added in e4cf3b2). DBs created before that commit
+    # are missing this column, and EVERY auth query (register/login/staff-login)
+    # SELECTs it — without this, auth 500s until the column exists.
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id VARCHAR(64) UNIQUE",
     """CREATE TABLE IF NOT EXISTS auth_security_state (
         id SERIAL PRIMARY KEY,
         kind VARCHAR(20) NOT NULL,
@@ -411,8 +415,35 @@ _SERVERLESS_SCHEMA_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS idx_stores_wa_phone ON stores(wa_cloud_phone_id)",
     "CREATE INDEX IF NOT EXISTS idx_stores_wa_session ON stores(wa_session)",
     # Subscription system (Razorpay checkout). The `subscriptions` table may already
-    # exist from an earlier schema (plan_name/plan_type) — add the columns the
-    # current ORM model (app/models/subscription.py) expects.
+    # exist from an earlier schema (plan_name/plan_type) — ensure it exists (full
+    # current column set, matches app/models/subscription.py), then add any columns
+    # a pre-existing table is missing. Both are no-ops when already present.
+    """CREATE TABLE IF NOT EXISTS subscriptions (
+        id SERIAL PRIMARY KEY,
+        store_id INTEGER NOT NULL UNIQUE REFERENCES stores(id),
+        plan_name VARCHAR(100) NOT NULL DEFAULT 'free',
+        plan_type VARCHAR(50) DEFAULT 'free',
+        tier VARCHAR(20) DEFAULT 'free',
+        status VARCHAR(20) DEFAULT 'active',
+        billing_cycle VARCHAR(20) DEFAULT 'monthly',
+        price_amount DOUBLE PRECISION DEFAULT 0,
+        currency VARCHAR(10) DEFAULT 'INR',
+        trial_start TIMESTAMPTZ,
+        trial_end TIMESTAMPTZ,
+        current_period_start TIMESTAMPTZ,
+        current_period_end TIMESTAMPTZ,
+        cancelled_at TIMESTAMPTZ,
+        gateway VARCHAR(50),
+        gateway_subscription_id VARCHAR(200),
+        gateway_customer_id VARCHAR(200),
+        custom_price DOUBLE PRECISION,
+        custom_features JSONB,
+        activated_by VARCHAR(100),
+        activation_source VARCHAR(100),
+        partner_code VARCHAR(50),
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ
+    )""",
     "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS tier VARCHAR(20) DEFAULT 'free'",
     "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS billing_cycle VARCHAR(20) DEFAULT 'monthly'",
     "ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS price_amount DOUBLE PRECISION DEFAULT 0",
@@ -593,6 +624,15 @@ _SERVERLESS_SCHEMA_STATEMENTS = [
         END IF;
     EXCEPTION WHEN others THEN NULL;
     END $$;""",
+    # Offline-sync dedup (added e4cf3b2): older DBs lack bills.local_id, which
+    # every offline bill POST writes. Column + unique index mirror setup_tables_v2.sql.
+    "ALTER TABLE bills ADD COLUMN IF NOT EXISTS local_id VARCHAR(50)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_bills_store_local_id ON bills(store_id, local_id)",
+    # suppliers.phone was relaxed from NOT NULL (added e4cf3b2); relax old DBs too.
+    """DO $$ BEGIN
+        ALTER TABLE suppliers ALTER COLUMN phone DROP NOT NULL;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;""",
     # Razorpay checkout-QR payments (UPI verification)
     """CREATE TABLE IF NOT EXISTS payments (
         id SERIAL PRIMARY KEY,
@@ -623,10 +663,17 @@ async def ensure_serverless_schema():
     try:
         async with engine.begin() as conn:
             for stmt in _SERVERLESS_SCHEMA_STATEMENTS:
+                # Run each statement in its own SAVEPOINT. Postgres aborts the
+                # WHOLE transaction on any error, so a single failing statement
+                # (e.g. ALTER on a table that doesn't exist) used to silently
+                # kill every statement after it. With per-statement savepoints
+                # each one succeeds or rolls back independently, so the rest of
+                # the list still applies to old DBs.
                 try:
-                    await conn.execute(text(stmt))
+                    async with conn.begin_nested():
+                        await conn.execute(text(stmt))
                 except Exception as e:
-                    logger.debug(f"[Schema] statement skipped: {e}")
+                    logger.warning(f"[Schema] statement skipped: {e}")
         logger.info("[Schema] Serverless schema ensured")
     except Exception as e:
         logger.warning(f"[Schema] ensure failed (continuing): {e}")
