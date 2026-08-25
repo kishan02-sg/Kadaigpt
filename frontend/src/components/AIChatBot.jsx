@@ -114,18 +114,19 @@ export default function AIChatBot({ addToast, setCurrentPage }) {
         }
     }, [])
 
-    const handleSend = async () => {
-        if (!input.trim()) return
+    const handleSend = async (overrideText = null) => {
+        const text = overrideText ?? input
+        if (!text.trim()) return
 
         const userMessage = {
             id: Date.now(),
             type: 'user',
-            text: input,
+            text,
             timestamp: new Date()
         }
 
         setMessages(prev => [...prev, userMessage])
-        setInput('')
+        if (!overrideText) setInput('')
         setIsTyping(true)
 
         // Simulate AI processing
@@ -176,8 +177,8 @@ export default function AIChatBot({ addToast, setCurrentPage }) {
     }
 
     const handleQuickAction = (action) => {
-        setInput(action.label)
-        setTimeout(handleSend, 100)
+        // Pass text directly to avoid stale-closure issue with async state update
+        handleSend(action.label)
     }
 
     const toggleVoice = () => {
@@ -189,7 +190,7 @@ export default function AIChatBot({ addToast, setCurrentPage }) {
         }
     }
 
-    const handleKeyPress = (e) => {
+    const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
             handleSend()
@@ -278,7 +279,7 @@ export default function AIChatBot({ addToast, setCurrentPage }) {
                                 placeholder="Ask anything..."
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                onKeyPress={handleKeyPress}
+                                onKeyDown={handleKeyDown}
                             />
                             <button
                                 className={`voice-btn ${isListening ? 'listening' : ''}`}

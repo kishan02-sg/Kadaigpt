@@ -174,45 +174,61 @@ export default function UnifiedAIAssistant({ addToast, setCurrentPage, products 
     const t = translations[language]
     const commands = quickCommands[language]
 
-    // Initialize
+    // Initialize or reset messages when panel opens or language changes
     useEffect(() => {
-        if (isOpen && messages.length === 0) {
-            setMessages([{
-                id: Date.now(),
-                type: 'agent',
-                agent: 'store_manager',
-                text: t.welcome,
-                timestamp: new Date()
-            }])
-        }
-
         if (isOpen) {
+            // Always update welcome message to match the current language
+            setMessages(prev => {
+                const welcomeMsg = {
+                    id: Date.now(),
+                    type: 'agent',
+                    agent: 'store_manager',
+                    text: t.welcome,
+                    timestamp: new Date()
+                }
+                // If empty, just set the welcome message
+                if (prev.length === 0) return [welcomeMsg]
+                // If only the welcome message exists, replace it with the current language version
+                if (prev.length === 1 && prev[0].type === 'agent') return [welcomeMsg]
+                // Conversation in progress — don't disrupt it
+                return prev
+            })
             fetchInsights()
             inputRef.current?.focus()
         }
     }, [isOpen, language])
 
-    // Speech recognition setup
+    // Speech recognition setup — clean up old instance before creating new one
     useEffect(() => {
+        // Stop any currently active recognition before rebuilding
+        try { recognitionRef.current?.stop() } catch { /* ignore */ }
+
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-            recognitionRef.current = new SpeechRecognition()
-            recognitionRef.current.continuous = false
-            recognitionRef.current.interimResults = false
+            const recognition = new SpeechRecognition()
+            recognition.continuous = false
+            recognition.interimResults = false
 
             // Set language based on UI language
             const langMap = { en: 'en-IN', hi: 'hi-IN', ta: 'ta-IN' }
-            recognitionRef.current.lang = langMap[language] || 'en-IN'
+            recognition.lang = langMap[language] || 'en-IN'
 
-            recognitionRef.current.onresult = (event) => {
+            recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript
                 setInput(transcript)
                 setIsListening(false)
                 setTimeout(() => sendMessage(transcript), 300)
             }
 
-            recognitionRef.current.onerror = () => setIsListening(false)
-            recognitionRef.current.onend = () => setIsListening(false)
+            recognition.onerror = () => setIsListening(false)
+            recognition.onend = () => setIsListening(false)
+
+            recognitionRef.current = recognition
+        }
+
+        return () => {
+            // Cleanup on unmount or language change
+            try { recognitionRef.current?.stop() } catch { /* ignore */ }
         }
     }, [language])
 
@@ -557,7 +573,7 @@ export default function UnifiedAIAssistant({ addToast, setCurrentPage, products 
                                 placeholder={t.placeholder}
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
                                 disabled={isProcessing}
                             />
 
