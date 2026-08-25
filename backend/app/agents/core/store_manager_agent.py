@@ -218,12 +218,21 @@ Now decide what to do next. Respond with valid JSON only."""
             return decision
 
         except Exception as e:
-            logger.error(f"[StoreManager] Thinking error: {e}")
-            return {
-                "action": "respond_to_user",
-                "parameters": {"message": f"I encountered an issue processing that request. Please try again."},
-                "reasoning": f"Error during reasoning: {str(e)}"
-            }
+            logger.warning(
+                f"[StoreManager] Gemini call failed ({type(e).__name__}: {e}). "
+                "Using keyword fallback."
+            )
+            # Gracefully fall back to keyword-based decision so users always
+            # get a useful response even when the LLM is unavailable.
+            try:
+                return self._fallback_decision(input_data.get('goal', ''))
+            except Exception as fallback_err:
+                logger.error(f"[StoreManager] Fallback also failed: {fallback_err}")
+                return {
+                    "action": "respond_to_user",
+                    "parameters": {"message": "I'm having trouble connecting right now. Please check your sales, inventory, or analytics pages directly."},
+                    "reasoning": f"Both Gemini and fallback failed: {str(e)}"
+                }
 
     def _fallback_decision(self, goal: str) -> Dict:
         """Simple keyword-based fallback when LLM is unavailable"""
